@@ -1,121 +1,148 @@
 <!-- Author: Anil Kalisetti -->
 # pytest-framework
 
-A reference **PyTest** framework for QA automation: UI, API, database and ETL/data-migration
-testing in one repo, with management-ready reporting, Jira defect creation, coverage,
-screenshots, Docker, cloud grids (Sauce Labs / BrowserStack / LambdaTest) and CI pipelines
-for GitHub Actions, Jenkins, GitLab and Azure DevOps.
+A reference **PyTest** framework for QA automation. One repository covers **UI, API, database and ETL /
+data-migration testing**, with management-ready reports, Jira defect creation, coverage, screenshots,
+self-healing locators, parallel runs, multi-browser and cloud-grid execution (Sauce Labs, BrowserStack,
+LambdaTest), Docker, and CI pipelines for GitHub Actions, Jenkins, GitLab and Azure DevOps.
 
-> **Status, honestly.** The offline layers (unit, data/ETL, db, reporting, Jira client, settings)
-> were exercised in a sandbox with no internet. The live layers (Selenium UI tests, the public
-> API tests, cloud grids, real Jira) were written carefully but **not run against the real
-> services**. Run `make smoke` once in your environment and expect to adjust a selector or
-> an assertion. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+> **Status, honestly.** Offline layers (unit, data/ETL, database, reporting, Jira client, settings, healing
+> logic) are verified by automated tests. Live layers (real browser, public APIs, cloud grids, real Jira) were
+> written carefully but **have not been run against the real services**. Run `make smoke` once in your
+> environment and expect to adjust a selector or an assertion. Details: [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+
+## Documentation
+
+| Read this | When you want to |
+|---|---|
+| [User guide](docs/USER_GUIDE.md) | install, configure, write UI/API/DB/ETL tests, run on cloud, read reports, troubleshoot |
+| [Capabilities](docs/CAPABILITIES.md) | see everything the framework can do, where it lives and how far it is proven |
+| [Running tests](docs/RUNNING.md) | run in parallel, group by tag, test on many browsers; the OOP map |
+| [Self-healing locators](docs/SELF_HEALING.md) | understand and operate locator healing |
+| [Architecture](docs/ARCHITECTURE.md) | understand the design rules and how to extend each part |
+| [Limitations](docs/LIMITATIONS.md) | know what is verified, what is not, and what is deliberately left out |
+| [Framework comparison](docs/FRAMEWORK_COMPARISON.md) | see how it ranks and the backlog of gaps |
+| [Contributing](CONTRIBUTING.md) / [Changelog](CHANGELOG.md) | contribute; see what changed |
 
 ## Quick start
 
 ```bash
 make install            # creates .venv, installs dependencies
-make unit               # offline self-tests, seconds
-make data db            # ETL + database tests, offline (in-memory SQLite)
-make api                # API tests (needs internet)
-make ui                 # browser tests (needs Chrome)
+make unit data db       # offline self-tests, ETL and database tests (seconds, no internet)
+make smoke              # fast business-critical checks across UI, API, DB
 make regression         # everything except @slow, in parallel
 make report             # open reports/executive_summary.html
 ```
+No `make`? `pytest -m smoke -n auto` works directly. `make help` lists every target.
 
-No `make`? Use `pytest -m smoke -n auto` directly. All options are plain pytest options.
+## Capabilities at a glance
 
-## What you get
-
-| Concern | Where | Notes |
+| Concern | What you get | More |
 |---|---|---|
-| Config | `framework/config`, `config/environments/*.yaml`, `.env` | CLI > env > YAML > defaults; secrets only from env |
-| UI | `framework/ui`, `tests/ui` | Page Objects, self-healing locators (`framework/ui/healing`), Selenium 4 driver factory, SauceDemo examples |
-| Browsers / targets | `framework/ui/browsers.py`, `targets.py` | one class per browser (Chrome, Firefox, Edge, Safari) and per place to run (local, Grid, Sauce Labs, BrowserStack, LambdaTest) |
-| Cloud grids | `framework/ui/targets.py` | `--execution-mode saucelabs\|browserstack\|lambdatest\|remote`; URL + auth are placeholders in `.env` |
-| API | `framework/api`, `tests/api` | Retrying client, one service class per resource, JSON-schema checks; JSONPlaceholder + httpbingo |
-| Database | `framework/db`, `tests/db` | Fetch test data from a DB, run it, write results back |
-| ETL / migration | `framework/data`, `tests/data` | Source-vs-target: counts, schema, nulls, duplicates, orphans, aggregates, full row diff, ~40 edge cases |
-| Reporting | `framework/reporting` | Self-contained HTML + Markdown + JSON, GREEN/AMBER/RED verdict, trend history |
-| Other reports | pytest-html, JUnit XML, Allure results, coverage HTML/XML | produced on every run |
-| Jira | `framework/integrations/jira_client.py` | De-duplicated defects, dry-run by default |
-| Screenshots | `framework/ui/screenshot.py` | On failure (configurable), attached to every report |
-| Parallel / retry | xdist, rerunfailures, timeout | xdist-safe plugins |
-| CI/CD | `.github/workflows`, `Jenkinsfile`, `.gitlab-ci.yml`, `azure-pipelines.yml` | Same `pytest` commands everywhere |
+| UI | Page Objects, Selenium 4, **self-healing locators**, Chrome / Edge / Firefox / Safari, one browser per test | [guide §4-5](docs/USER_GUIDE.md#4-writing-ui-tests) |
+| Where it runs | your machine, any Selenium Grid, Sauce Labs, BrowserStack, LambdaTest (URL + auth placeholders) | [guide §9](docs/USER_GUIDE.md#9-running-on-grid-sauce-labs-browserstack-lambdatest) |
+| API | retrying client, one **service class per resource**, JSON-schema checks, JSONPlaceholder + httpbingo suites | [guide §6](docs/USER_GUIDE.md#6-writing-api-tests) |
+| Database | read test data from a DB, execute, **write results back**; SQLAlchemy, bound parameters | [guide §7](docs/USER_GUIDE.md#7-database-driven-tests) |
+| ETL / migration | row count, schema, nulls, duplicates, orphans, aggregates, **streaming full-row diff**, ~40 edge cases | [guide §8](docs/USER_GUIDE.md#8-data-migration--etl-validation) |
+| Grouping | tags `smoke sanity regression uat e2e critical`, typo-safe `--tags`, `--list-tags` | [guide §3](docs/USER_GUIDE.md#3-choosing-which-tests-run) |
+| Speed | parallel (`-n`), per-worker data and logs, retries, timeouts | [RUNNING](docs/RUNNING.md) |
+| Reporting | executive HTML/MD/JSON with **GREEN / AMBER / RED** verdict, by area / tag / browser, trend; pytest-html, JUnit, Allure results, coverage | [guide §10](docs/USER_GUIDE.md#10-reports) |
+| Defects | Jira bugs per failure, de-duplicated, dry-run first, safety cap | [guide §11](docs/USER_GUIDE.md#11-jira-defects) |
+| Delivery | Docker, local Grid via compose, four CI pipelines, Makefile, pre-commit | [guide §12-13](docs/USER_GUIDE.md#12-cicd) |
 
-## Parallel, tags and browsers
+## Make targets
+
+| Command | Does |
+|---|---|
+| `make install` / `make install-dev` | create `.venv` and install dependencies / also lint tooling and git hooks |
+| `make lint` / `make format` / `make typecheck` | ruff check / auto-fix / mypy |
+| `make unit` / `make data` / `make db` | offline framework self-tests / ETL tests / database tests |
+| `make api` / `make ui` | API tests (internet) / browser tests (Chrome, or `MODE=saucelabs`) |
+| `make smoke` / `make regression` / `make all` | smoke / everything except slow / everything |
+| `make tag TAGS="uat"` / `make parallel TAGS="smoke or uat"` / `make tags` | run a tag group / in parallel / count tests per tag |
+| `make browsers BROWSERS=chrome,firefox` | UI tests on several browsers |
+| `make record-locators` | record the self-healing baseline |
+| `make report` / `make allure` | open the management report / Allure report |
+| `make docker-build` / `make docker-test` | build the image / run with a local Selenium Grid |
+| `make clean` | remove reports and caches |
+
+## Command cheat sheet
 
 ```bash
-pytest -n auto --tags "smoke or uat"                  # parallel, grouped by tag
-pytest -m ui --ui-browsers chrome,firefox -n 4        # every UI test on two browsers, 4 workers
+pytest --tags "smoke or uat" -n auto                  # group by tag, in parallel
+pytest -m ui --ui-browsers chrome,firefox -n 4        # every UI test on two browsers
 pytest --list-tags                                    # tests per tag
-```
-Details, safety rules for parallel runs and the OOP map: [docs/RUNNING.md](docs/RUNNING.md).
-
-## Self-healing locators
-A renamed id no longer breaks the suite: broken locators are repaired at run time (declared
-fallbacks, then a fingerprint match with safety guards) and every heal is reported for review.
-`--fail-on-heal` makes it a release gate; `make record-locators` records the baseline.
-See [docs/SELF_HEALING.md](docs/SELF_HEALING.md).
-
-## Run it your way
-
-```bash
-pytest -m smoke                                   # by marker
-pytest tests/api -n 4                             # a folder, 4 workers
-pytest --test-env staging                         # another environment file
-pytest -m ui --ui-browser chrome --headed         # watch the browser
-pytest -m ui --execution-mode saucelabs           # cloud (set SAUCE_USERNAME / SAUCE_ACCESS_KEY)
-pytest -m "not slow" --raise-jira-defects         # create Jira bugs (see below)
-docker compose up --build --abort-on-container-exit --exit-code-from tests   # local Selenium Grid
+pytest --test-env staging                             # another environment file
+pytest -m ui --headed --ui-browser firefox            # watch one browser
+pytest -m ui --execution-mode saucelabs --build-name rel-24.3   # cloud (set SAUCE_USERNAME / SAUCE_ACCESS_KEY)
+pytest --tags smoke --fail-on-heal                    # release gate: fail if any locator had to be healed
+pytest --raise-jira-defects                           # Jira bugs (dry run until JIRA_* are set)
+pytest --no-healing                                   # plain Selenium behaviour
+make record-locators                                  # record the self-healing baseline (known-good build only)
+docker compose up --build --abort-on-container-exit --exit-code-from tests   # tests + local Selenium Grid
 ```
 
-### Cloud platforms (placeholders to fill)
+| Option | Meaning |
+|---|---|
+| `--test-env NAME` | load `config/environments/NAME.yaml` |
+| `--ui-browser B` / `--ui-browsers A,B` or `all` / `--headed` | browser(s); show the window |
+| `--execution-mode M` / `--grid-url URL` / `--build-name N` | where UI tests run; hub URL; cloud build label |
+| `--tags EXPR` / `--list-tags` | select by tag (validated) / count tests per tag |
+| `--screenshots on_failure\|always\|never` | screenshot policy |
+| `--no-healing` / `--record-locators` / `--fail-on-heal` | self-healing switches |
+| `--raise-jira-defects` / `--jira-max-defects N` | Jira defect creation and its cap |
+
+Settings and environment variables are listed in the [user guide](docs/USER_GUIDE.md#2-configuration);
+precedence is CLI > environment/`.env` > `config/environments/*.yaml` > defaults, and secrets only ever come
+from the environment.
+
+## Cloud platforms (placeholders to fill)
 
 Copy `.env.example` to `.env` and set:
 
 | Platform | Variables |
 |---|---|
-| Sauce Labs | `SAUCE_USERNAME`, `SAUCE_ACCESS_KEY`, optional `GRID_URL` (default region endpoint is used otherwise) |
+| Sauce Labs | `SAUCE_USERNAME`, `SAUCE_ACCESS_KEY`, optional `GRID_URL` (default region endpoint otherwise) |
 | BrowserStack | `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` |
 | LambdaTest | `LT_USERNAME`, `LT_ACCESS_KEY` |
 | Any Selenium Grid | `EXECUTION_MODE=remote`, `GRID_URL` |
 
-Keys are never read from YAML (the loader rejects them) and are masked in logs.
+## Management report
 
-### Management report
-
-After every run open `reports/executive_summary.html`. It shows the build verdict
-(GREEN ≥ 95 % pass, AMBER ≥ 80 %, RED below, or any failed `@critical` test), results per
-layer, failures with screenshots, slowest tests, coverage and the trend over previous runs.
-The same content is in `reports/summary.md` (pasted into the GitHub job summary by CI) and
-`reports/summary.json` (for dashboards).
-
-### Jira defects
-
-```bash
-pytest --raise-jira-defects        # without JIRA_* env vars: DRY RUN, writes reports/jira_defects_preview.json
-```
-Set `JIRA_BASE_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` to create real
-bugs. A fingerprint label prevents duplicates (an open bug gets a comment instead),
-`--jira-max-defects` caps a bad run, and `@pytest.mark.known_defect("ABC-123")` suppresses
-re-raising a bug you already track.
+Open `reports/executive_summary.html` after any run. Verdict: **GREEN** >= 95 % pass with no failed `critical`
+test, **AMBER** >= 80 %, **RED** below or any failed `critical` test. It also shows results by area, tag and
+browser, locators that healed, failures with screenshots, flaky tests, coverage and the trend. The same content is
+in `reports/summary.md` (published to the GitHub job summary by CI) and `reports/summary.json`.
 
 ## Project layout
 
 ```
-framework/   reusable libraries (config, core, ui, api, db, data, integrations, reporting, plugins)
-tests/       unit/ (framework self-tests)  ui/  api/  db/  data/
-config/      environments/*.yaml
-docs/        ARCHITECTURE.md  FRAMEWORK_COMPARISON.md  LIMITATIONS.md
+framework/
+  config/         layered settings (CLI > env > YAML > defaults)
+  core/           logging, waits, data loading, tags, parallel helpers, CI detection
+  ui/             base_page, browsers, targets, driver_factory, screenshot, pages/, healing/
+  api/            client, services (one class per resource), assertions, auth placeholder
+  db/             client, repository (read test data, write results back), sample data
+  data/           ETL validator
+  integrations/   Jira client
+  reporting/      models and executive report renderers
+  plugins/        pytest plugins: options, tags, evidence, healing, jira, executive report
+  sample_app/     systems under test used by the examples (tax calculator, CRM migration)
+tests/            unit/ (framework self-tests)  ui/  api/  db/  data/
+config/           environments/*.yaml, locator_fingerprints.json (self-healing baseline)
+docs/             USER_GUIDE  CAPABILITIES  RUNNING  SELF_HEALING  ARCHITECTURE  FRAMEWORK_COMPARISON  LIMITATIONS
 ```
 
 ## Writing your own tests
 
-1. Pick the layer folder; the layer marker is applied automatically.
-2. Add `@pytest.mark.smoke` / `regression` / `critical` as appropriate.
-3. Use fixtures: `settings`, `api_client`, `driver`, `db`, `validator`, page-object fixtures.
-4. Replace the sample app (`framework/sample_app`) and sample sites with yours.
+1. Put the test in the layer folder (`tests/ui`, `api`, `db`, `data`); the layer tag is added automatically.
+2. Add tags: `@pytest.mark.smoke`, `regression`, `uat`, `e2e`, `critical`.
+3. Use the fixtures: `settings`, `driver`, `login_page`, `healer`, `api_client`, `posts_api`, `db`, `repo`, `validator`.
+4. Replace the sample app and sample sites with yours. Step-by-step examples: [user guide](docs/USER_GUIDE.md).
+
+## Keeping these docs current
+
+Every change updates this README and the [changelog](CHANGELOG.md). `tests/unit/test_documentation.py` fails if a
+command-line option or setting is undocumented, a documentation file is not linked from here, or a link is broken.
 
 Author: Anil Kalisetti · License: MIT
