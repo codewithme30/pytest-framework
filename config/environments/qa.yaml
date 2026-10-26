@@ -1,0 +1,12 @@
+# Author: Anil Kalisetti
+# Non-secret defaults for the QA environment. Secrets (access keys, tokens) are NEVER
+# stored here; the loader rejects them. Provide them via environment variables.
+base_ui_url: https://www.saucedemo.com
+base_api_url: https://jsonplaceholder.typicode.com
+httpbin_url: https://httpbingo.org
+product_name: Sample Retail Platform
+browser: chrome
+headless: true
+explicit_wait: 10
+api_timeout: 15
+db_url: sqlite:///reports/sample_test.db

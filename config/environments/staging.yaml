@@ -1,0 +1,12 @@
+# Author: Anil Kalisetti
+# Placeholder staging environment. Point these at your real pre-production endpoints.
+# TODO(future): add per-environment feature flags and test-account pools here.
+base_ui_url: https://staging.example.com
+base_api_url: https://api.staging.example.com
+httpbin_url: https://httpbingo.org
+product_name: Sample Retail Platform (Staging)
+browser: chrome
+headless: true
+explicit_wait: 15
+api_timeout: 20
+db_url: sqlite:///reports/sample_test.db

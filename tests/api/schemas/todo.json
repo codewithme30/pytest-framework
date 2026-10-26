@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "required": ["userId", "id", "title", "completed"],
+  "properties": {
+    "userId": {"type": "integer"},
+    "id": {"type": "integer"},
+    "title": {"type": "string"},
+    "completed": {"type": "boolean"}
+  }
+}

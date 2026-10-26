@@ -1,0 +1,8 @@
+# Author: Anil Kalisetti
+# Developer tooling: linting, typing, pre-commit hooks.
+-r requirements.txt
+ruff>=0.6
+mypy>=1.11
+types-requests
+types-PyYAML
+pre-commit>=3.8

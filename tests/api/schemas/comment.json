@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["postId", "id", "name", "email", "body"],
+  "properties": {
+    "postId": {"type": "integer", "minimum": 1},
+    "id": {"type": "integer", "minimum": 1},
+    "name": {"type": "string"},
+    "email": {"type": "string", "pattern": "^[^@\\s]+@[^@\\s]+$"},
+    "body": {"type": "string"}
+  }
+}

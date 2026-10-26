@@ -1,0 +1,18 @@
+# Author: Anil Kalisetti
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+reports/
+allure-report/
+*.egg-info/
+build/
+dist/
+.idea/
+.vscode/

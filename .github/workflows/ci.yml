@@ -1,0 +1,124 @@
+# ---------------------------------------------------------------------------
+# Author  : Anil Kalisetti
+# Purpose : GitHub Actions pipeline. Offline layers gate every PR; network/UI layers run
+#           on schedule or on demand so a third-party outage never blocks a merge.
+# Secrets : Settings > Secrets and variables > Actions. Names are listed in .env.example.
+# ---------------------------------------------------------------------------
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 6 * * 1-5"          # weekdays 06:30 UTC: nightly regression
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: "pytest -m expression"
+        default: "not slow"
+      execution_mode:
+        description: "UI execution mode"
+        type: choice
+        options: [local, remote, saucelabs, browserstack, lambdatest]
+        default: local
+      raise_jira_defects:
+        description: "Create Jira defects for failures"
+        type: boolean
+        default: false
+
+concurrency:                         # cancel superseded runs of the same PR
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy framework
+
+  offline-tests:                      # unit + data + db: no network, deterministic, fast
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python-version }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: pytest -m "(unit or data or db) and not slow" -n auto --test-env qa
+      - name: Publish management summary
+        if: always()
+        run: '[ -f reports/summary.md ] && cat reports/summary.md >> "$GITHUB_STEP_SUMMARY" || true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-reports-py${{ matrix.python-version }}
+          path: reports/
+          retention-days: 14
+
+  api-tests:                          # hits public sample APIs: skipped on PRs from forks
+    needs: offline-tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: pytest -m api -n 4 --reruns 2 --reruns-delay 2
+      - name: Publish management summary
+        if: always()
+        run: '[ -f reports/summary.md ] && cat reports/summary.md >> "$GITHUB_STEP_SUMMARY" || true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: api-reports, path: reports/, retention-days: 14 }
+
+  ui-tests:                           # nightly / manual: browsers are the slowest, flakiest layer
+    needs: offline-tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      EXECUTION_MODE: ${{ inputs.execution_mode || 'local' }}
+      SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+      SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      LT_USERNAME: ${{ secrets.LT_USERNAME }}
+      LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - name: Run UI + API regression
+        run: >
+          pytest -m "${{ inputs.marker || 'not slow' }}" -n 4
+          --reruns 1 --only-rerun WebDriverException
+          --build-name "gha-${{ github.run_number }}"
+          ${{ inputs.raise_jira_defects && '--raise-jira-defects' || '' }}
+      - name: Publish management summary
+        if: always()
+        run: '[ -f reports/summary.md ] && cat reports/summary.md >> "$GITHUB_STEP_SUMMARY" || true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ui-reports, path: reports/, retention-days: 30 }

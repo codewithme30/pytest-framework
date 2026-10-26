@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# Author  : Anil Kalisetti
+# Purpose : Run UI tests against a real Selenium Grid on your own machine (no cloud account).
+# Run     : docker compose up --build --abort-on-container-exit --exit-code-from tests
+# Watch   : http://localhost:7900 (noVNC, password: secret) shows the browser live.
+# ---------------------------------------------------------------------------
+services:
+  selenium:
+    image: selenium/standalone-chrome:latest
+    shm_size: "2gb"            # Chrome crashes with the default 64 MB /dev/shm
+    ports:
+      - "4444:4444"            # WebDriver endpoint / Grid UI
+      - "7900:7900"            # live browser view
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  tests:
+    build: .
+    depends_on:
+      selenium:
+        condition: service_healthy
+    environment:
+      EXECUTION_MODE: remote
+      GRID_URL: http://selenium:4444/wd/hub
+      HEADLESS: "false"        # the grid owns the display
+    env_file:
+      - path: .env             # optional: Jira / DB settings (file may be absent)
+        required: false
+    volumes:
+      - ./reports:/app/reports
+    command: ["-m", "ui or api or data or db", "-n", "2", "--reruns", "1"]

@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# Author  : Anil Kalisetti
+# Purpose : Azure DevOps pipeline. Put secrets in a Variable Group named "pytest-framework-secrets"
+#           (SAUCE_USERNAME, SAUCE_ACCESS_KEY, JIRA_API_TOKEN, ...).
+# ---------------------------------------------------------------------------
+trigger:
+  branches: { include: [main] }
+
+schedules:
+  - cron: "30 6 * * 1-5"
+    displayName: Weekday nightly regression
+    branches: { include: [main] }
+    always: true
+
+pool: { vmImage: ubuntu-latest }
+
+variables:
+  - group: pytest-framework-secrets   # TODO: create this variable group
+
+steps:
+  - task: UsePythonVersion@0
+    inputs: { versionSpec: "3.12" }
+  - script: pip install -r requirements.txt
+    displayName: Install dependencies
+  - script: pytest -m "(unit or data or db) and not slow" -n auto
+    displayName: Offline checks
+  - script: pytest -m "api or ui" -n 4 --reruns 1 --build-name "ado-$(Build.BuildId)"
+    displayName: Regression
+    env:
+      SAUCE_USERNAME: $(SAUCE_USERNAME)
+      SAUCE_ACCESS_KEY: $(SAUCE_ACCESS_KEY)
+      JIRA_API_TOKEN: $(JIRA_API_TOKEN)
+  - task: PublishTestResults@2
+    condition: always()
+    inputs: { testResultsFormat: JUnit, testResultsFiles: reports/junit.xml }
+  - task: PublishCodeCoverageResults@2
+    condition: always()
+    inputs: { summaryFileLocation: reports/coverage.xml }
+  - task: PublishBuildArtifacts@1
+    condition: always()
+    inputs: { PathtoPublish: reports, ArtifactName: reports }

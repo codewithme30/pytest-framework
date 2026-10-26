@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------------------
+# Project   : pytest-framework
+# Author    : Anil Kalisetti
+# Purpose   : Single source of truth for packaging, pytest, lint and coverage.
+# ---------------------------------------------------------------------------
+
+[project]
+name = "pytest-framework"
+version = "1.0.0"
+description = "Reference PyTest framework: UI, API, ETL/data validation, DB-driven tests, Jira and executive reporting."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Anil Kalisetti" }]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+# Reports are produced on every run so CI and local runs behave identically.
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--junitxml=reports/junit.xml",
+    "--html=reports/report.html",
+    "--self-contained-html",
+    "--alluredir=reports/allure-results",
+    "--clean-alluredir",
+    "--cov=framework",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=xml:reports/coverage.xml",
+    "--cov-report=html:reports/coverage-html",
+]
+timeout = 180
+log_file = "reports/pytest.log"
+log_file_level = "DEBUG"
+log_file_format = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+markers = [
+    "smoke: fast, business-critical checks run on every commit",
+    "sanity: narrow checks run after a deployment",
+    "regression: full functional suite",
+    "critical: a failure here turns the build RED regardless of pass rate",
+    "slow: long-running test (volume, soak); deselect with -m 'not slow'",
+    "ui: browser based test (auto-applied from tests/ui)",
+    "api: HTTP API test (auto-applied from tests/api)",
+    "data: ETL / data validation test (auto-applied from tests/data)",
+    "db: database driven test (auto-applied from tests/db)",
+    "etl: source-to-target data migration / reconciliation test",
+    "unit: framework self-test, fully offline (auto-applied from tests/unit)",
+    "network: needs access to the public internet",
+    "known_defect(jira_key): failure is already tracked; do not raise a new Jira bug",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["framework"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+fail_under = 0  # CI enforces the real threshold via --cov-fail-under
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "PT"]
+ignore = ["PT011"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true

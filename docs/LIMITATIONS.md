@@ -1,0 +1,33 @@
+<!-- Author: Anil Kalisetti -->
+# What is verified, what is not, and what is deliberately left out
+
+## Verification status
+
+| Area | Status |
+|---|---|
+| Unit, data/ETL, db logic, reporting, Jira client, settings | Run offline in a sandbox using a minimal pytest-compatible runner (no internet, no pip). 298 of 299 passed, 1 skipped (needs Selenium). Mutation checks confirmed tests fail when logic is broken. |
+| Real `pytest` plugin wiring (`conftest.py`, evidence/Jira/report plugins, xdist) | **Not run.** Written to documented pytest hooks; first real run may need small fixes. |
+| SQLAlchemy-backed `DatabaseClient` | **Not run** (stdlib sqlite3 stand-in used). |
+| Selenium UI tests, driver factory, cloud grids | **Not run.** SauceDemo selectors are from memory. |
+| Public API tests (JSONPlaceholder, httpbingo) | **Not run.** A few expectations (`/bytes/0`, `x-total-count`, `/posts/abc`) are from memory. |
+| Live Jira | **Not run**; request shapes follow Jira Cloud REST v3. |
+
+First step in your environment: `make install && make unit data db`, then `make smoke`.
+
+## Not included, and why
+
+| Feature | Reason / next step |
+|---|---|
+| Allure HTML generation | Results are produced; rendering needs the Allure CLI (a Java tool). `make allure` runs it if installed. |
+| Mobile (Appium) | Needs devices/emulators and a different driver stack; the cloud capability layer is ready to extend. |
+| Visual regression | Needs a baseline-image store and policy decisions (tolerance, ownership). |
+| Performance / load | Belongs in Locust/k6; pytest is not a load generator. |
+| Contract testing (Pact) | Needs a broker and provider pipelines. |
+| BDD (pytest-bdd) | A style choice; adds a Gherkin layer many teams do not want. |
+| Accessibility (axe-core) | Needs the axe script bundled or fetched; good next addition. |
+| Playwright option | Selenium chosen because cloud vendors are Selenium-first; a Playwright driver could implement the same page-object interface. |
+| Secrets manager (Vault, AWS SM) | Environment variables work with every CI; adapters are site-specific. |
+| Persistent trend store | `history.json` is per workspace; CI needs a cache/artifact or database to persist it. |
+| OAuth2/API-token auth | Placeholder in `framework/api/auth.py` with detailed TODO. |
+| Non-SQLite DB drivers | SQLAlchemy supports them; install the driver and set `DB_URL`. |
+| Test impact analysis, flaky-test quarantine DB | Needs historical storage across runs. |

@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["albumId", "id", "title", "url", "thumbnailUrl"],
+  "properties": {
+    "albumId": {"type": "integer"},
+    "id": {"type": "integer"},
+    "title": {"type": "string"},
+    "url": {"type": "string", "pattern": "^https?://"},
+    "thumbnailUrl": {"type": "string", "pattern": "^https?://"}
+  }
+}
