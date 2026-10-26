@@ -61,8 +61,9 @@ Not included at all (Appium, visual regression, load testing, BDD...): see [LIMI
 |---|---|---|---|
 | Executive report | GREEN/AMBER/RED verdict, KPIs, by area/tag/browser, healed locators, failures with evidence, trend, slowest, flaky | `framework/reporting/` | Verified (rendering and rules) |
 | Report formats | HTML, Markdown, JSON (pluggable `ReportRenderer` classes) | `executive_report.py` | Verified |
-| Technical reports | pytest-html, JUnit XML, Allure results | `pyproject.toml` | Not run live (Allure HTML needs its CLI) |
-| Code coverage | line + branch of `framework/`, HTML + XML, shown in the summary | `pyproject.toml`, `executive_report_plugin.py` | Not run live |
+| Choose your reports | `REPORTS` / `--reports` picks any of executive, html, junit, allure, coverage (or all / none); `--list-reports`; typo-safe; missing plugin skipped with a note | `framework/reporting/outputs.py`, `plugins/report_selection_plugin.py` | Verified (selection logic); Not run live under real pytest |
+| Technical reports | pytest-html, JUnit XML, Allure results | `outputs.py` | Not run live (Allure HTML needs its CLI) |
+| Code coverage | line + branch of `framework/`, terminal + HTML + XML, shown in the summary | `framework/reporting/coverage_report.py` | Verified (logic with a stand-in); Not run live |
 | Jira | one de-duplicated bug per failure, attachments, dry-run, safety cap, `known_defect` | `framework/integrations/jira_client.py`, `plugins/jira_plugin.py` | Verified (client against stub); Not run live |
 | Trend across runs | `history.json` per workspace | `executive_report.py` | Verified; cross-run persistence Placeholder |
 | CI metadata | GitHub Actions, Jenkins, GitLab, Azure DevOps detected for build info | `framework/core/ci_info.py` | Verified |

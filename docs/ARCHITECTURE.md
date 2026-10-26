@@ -46,6 +46,7 @@ Numbers compare as `Decimal`; the transform hook maps legacy conventions (cents 
 | A new healing strategy | subclass `HealingStrategy` (`framework/ui/healing/strategies.py`), add it in `LocatorHealer.from_settings` |
 | A new cloud vendor | subclass `CloudTarget` in `framework/ui/targets.py`: capability block + status script; add the mode to `EXECUTION_MODES` |
 | A new API resource | subclass `ResourceService` in `framework/api/services.py` |
+| A new report type users can select | subclass `PluginReport` (a pytest plugin writes it) or `GeneratedReport` (we write it) in `framework/reporting/outputs.py`, add the name to `REPORT_NAMES` in settings (a unit test fails if they drift) |
 | A new report format | subclass `ReportRenderer` in `framework/reporting/executive_report.py` |
 | A new scenario table | subclass `ScenarioRepository` and set `table` |
 | Token auth for an API | implement `framework/api/auth.py` (placeholder with detailed TODO) |

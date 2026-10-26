@@ -79,6 +79,7 @@ Every setting is an environment variable named after the field in upper case (`H
 | `ETL_SOURCE_DB_URL` / `ETL_TARGET_DB_URL` | empty | placeholders for real source/target systems |
 | `JIRA_ENABLED`, `JIRA_BASE_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`, `JIRA_ISSUE_TYPE`, `JIRA_LABELS` | off | see [section 11](#11-jira-defects) |
 | `REPORTS_DIR` | `reports` | output folder |
+| `REPORTS` | `all` | which reports to generate: `executive,html,junit,allure,coverage`, `all` or `none`; `--reports` |
 | `SCREENSHOT_POLICY` | `on_failure` | `on_failure`, `always`, `never`; `--screenshots` |
 | `PASS_RATE_GREEN` / `PASS_RATE_AMBER` | 95 / 80 | verdict thresholds |
 
@@ -265,7 +266,37 @@ paid session starts. A device/OS matrix file is a documented placeholder in `fra
 
 ## 10. Reports
 
-Every run writes to `reports/`:
+### Choosing which reports a run produces
+
+You pick the report types; only those are generated at the end of the run.
+
+```bash
+pytest --reports html                  # just the pytest-html report
+pytest --reports allure,junit          # Allure results + JUnit XML
+REPORTS=executive,coverage pytest      # same idea from the environment (handy in CI, .env, make)
+make smoke REPORTS=html                # make passes it through
+pytest --reports none                  # no report files at all
+pytest --list-reports                  # what exists
+```
+
+| Type | Produces | Needs |
+|---|---|---|
+| `executive` | `executive_summary.html`, `summary.md`, `summary.json`, trend | nothing extra |
+| `html` | `report.html` (pytest-html, self-contained) | `pytest-html` |
+| `junit` | `junit.xml` | built into pytest |
+| `allure` | `allure-results/` (view with `make allure`) | `allure-pytest`, Allure CLI to view |
+| `coverage` | terminal table, `coverage.xml`, `coverage-html/` | `pytest-cov` |
+
+Rules: the default is `all`, so nothing changes until you choose; names are case-insensitive and a typo is an
+error (never a silently missing report); a type whose plugin is not installed is skipped and named in the
+run header (`reports: junit (skipped, plugin not installed: allure)`); a plugin flag you type yourself
+(`--html=my.html`) wins over the selection. Coverage is always *measured* (pytest-cov must start first) but only
+*written* when selected; add pytest-cov's `--no-cov` to skip measuring for the fastest run. If you select
+`coverage` or `executive`, the executive summary still shows the coverage figure whenever data exists.
+
+### What the files are
+
+Every selected report is written to `reports/`:
 
 | File | Audience | Content |
 |---|---|---|

@@ -25,6 +25,9 @@ on:
         type: choice
         options: [local, remote, saucelabs, browserstack, lambdatest]
         default: local
+      reports:
+        description: "Reports to generate: comma list of executive,html,junit,allure,coverage, or all / none"
+        default: "all"
       raise_jira_defects:
         description: "Create Jira defects for failures"
         type: boolean
@@ -118,6 +121,7 @@ jobs:
           pytest --tags "${{ inputs.tags || 'not slow' }}"
           --ui-browsers "${{ inputs.browsers || 'chrome,firefox' }}"
           -n 4 --reruns 1 --only-rerun WebDriverException
+          --reports "${{ inputs.reports || 'all' }}"
           --build-name "gha-${{ github.run_number }}"
           ${{ inputs.raise_jira_defects && '--raise-jira-defects' || '' }}
       - name: Publish management summary

@@ -4,6 +4,11 @@
 Every change to the framework adds an entry here and updates the README (a unit test fails if a new
 command-line option or setting is not documented). Newest first.
 
+## 2026-10-26 - Selectable reports (branch `develop`)
+* `REPORTS` setting / `--reports` flag chooses any of `executive, html, junit, allure, coverage` (or `all`, `none`); `--list-reports`.
+* Report flags removed from `pyproject.toml`; `ReportOutput` classes switch the plugins on at run time; coverage outputs are written by `CoverageReporter`.
+* Default is `all`, so existing pipelines behave as before. GitHub Actions gained a `reports` input.
+
 ## 2026-10-26 - Documentation
 * Added [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (task-oriented) and [docs/CAPABILITIES.md](docs/CAPABILITIES.md)
   (what exists, where, how far verified).

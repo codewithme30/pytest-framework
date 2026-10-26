@@ -46,7 +46,7 @@ No `make`? `pytest -m smoke -n auto` works directly. `make help` lists every tar
 | ETL / migration | row count, schema, nulls, duplicates, orphans, aggregates, **streaming full-row diff**, ~40 edge cases | [guide §8](docs/USER_GUIDE.md#8-data-migration--etl-validation) |
 | Grouping | tags `smoke sanity regression uat e2e critical`, typo-safe `--tags`, `--list-tags` | [guide §3](docs/USER_GUIDE.md#3-choosing-which-tests-run) |
 | Speed | parallel (`-n`), per-worker data and logs, retries, timeouts | [RUNNING](docs/RUNNING.md) |
-| Reporting | executive HTML/MD/JSON with **GREEN / AMBER / RED** verdict, by area / tag / browser, trend; pytest-html, JUnit, Allure results, coverage | [guide §10](docs/USER_GUIDE.md#10-reports) |
+| Reporting | **you choose** which of executive / html / junit / allure / coverage to generate (`REPORTS`, `--reports`); executive HTML/MD/JSON with **GREEN / AMBER / RED** verdict, by area / tag / browser, trend; pytest-html, JUnit, Allure results, coverage | [guide §10](docs/USER_GUIDE.md#10-reports) |
 | Defects | Jira bugs per failure, de-duplicated, dry-run first, safety cap | [guide §11](docs/USER_GUIDE.md#11-jira-defects) |
 | Delivery | Docker, local Grid via compose, four CI pipelines, Makefile, pre-commit | [guide §12-13](docs/USER_GUIDE.md#12-cicd) |
 
@@ -75,6 +75,7 @@ pytest --list-tags                                    # tests per tag
 pytest --test-env staging                             # another environment file
 pytest -m ui --headed --ui-browser firefox            # watch one browser
 pytest -m ui --execution-mode saucelabs --build-name rel-24.3   # cloud (set SAUCE_USERNAME / SAUCE_ACCESS_KEY)
+pytest --reports html,junit                       # choose the reports a run produces (default: all)
 pytest --tags smoke --fail-on-heal                    # release gate: fail if any locator had to be healed
 pytest --raise-jira-defects                           # Jira bugs (dry run until JIRA_* are set)
 pytest --no-healing                                   # plain Selenium behaviour
@@ -89,6 +90,7 @@ docker compose up --build --abort-on-container-exit --exit-code-from tests   # t
 | `--execution-mode M` / `--grid-url URL` / `--build-name N` | where UI tests run; hub URL; cloud build label |
 | `--tags EXPR` / `--list-tags` | select by tag (validated) / count tests per tag |
 | `--screenshots on_failure\|always\|never` | screenshot policy |
+| `--reports TYPES` / `--list-reports` | choose reports: `executive,html,junit,allure,coverage`, `all`, `none` (or `REPORTS=...`) |
 | `--no-healing` / `--record-locators` / `--fail-on-heal` | self-healing switches |
 | `--raise-jira-defects` / `--jira-max-defects N` | Jira defect creation and its cap |
 
@@ -108,6 +110,8 @@ Copy `.env.example` to `.env` and set:
 | Any Selenium Grid | `EXECUTION_MODE=remote`, `GRID_URL` |
 
 ## Management report
+
+Choose what a run generates with `REPORTS` or `--reports` (`pytest --list-reports` shows the types); the default is all.
 
 Open `reports/executive_summary.html` after any run. Verdict: **GREEN** >= 95 % pass with no failed `critical`
 test, **AMBER** >= 80 %, **RED** below or any failed `critical` test. It also shows results by area, tag and

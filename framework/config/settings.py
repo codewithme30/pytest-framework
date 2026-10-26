@@ -33,6 +33,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXECUTION_MODES = ("local", "remote", "saucelabs", "browserstack", "lambdatest")
 BROWSERS = ("chrome", "firefox", "edge", "safari")
 SCREENSHOT_POLICIES = ("on_failure", "always", "never")
+# Report types a user can select (see framework/reporting/outputs.py; a unit test keeps both in step).
+REPORT_NAMES = ("executive", "html", "junit", "allure", "coverage")
 
 # Fields that must never be committed to a YAML file.
 _SECRET_FIELDS = frozenset({"grid_access_key", "jira_api_token"})
@@ -104,6 +106,7 @@ class Settings:
 
     # --- Reporting -------------------------------------------------------------
     reports_dir: str = "reports"
+    reports: str = "all"  # comma list of report types, "all" or "none" (--reports on the command line)
     screenshot_policy: str = "on_failure"
     pass_rate_green: float = 95.0
     pass_rate_amber: float = 80.0
@@ -112,6 +115,7 @@ class Settings:
         _require_in("execution_mode", self.execution_mode, EXECUTION_MODES)
         _require_in("browser", self.browser, BROWSERS)
         _require_in("screenshot_policy", self.screenshot_policy, SCREENSHOT_POLICIES)
+        parse_report_selection(self.reports)  # fail fast on a typo such as "alure"
         if not 0 < self.heal_threshold <= 1 or self.heal_margin < 0 or self.heal_after < 0:
             raise ConfigurationError("Healing needs 0 < heal_threshold <= 1, heal_margin >= 0, heal_after >= 0")
         if not 0 <= self.pass_rate_amber <= self.pass_rate_green <= 100:
@@ -120,6 +124,13 @@ class Settings:
     @property
     def reports_path(self) -> Path:
         return Path(self.reports_dir)
+
+    @property
+    def selected_reports(self) -> tuple[str, ...]:
+        return parse_report_selection(self.reports)
+
+    def wants_report(self, name: str) -> bool:
+        return name in self.selected_reports
 
     @property
     def locator_baseline_path(self) -> Path:
@@ -131,6 +142,25 @@ class Settings:
         return all(
             (self.jira_base_url, self.jira_user_email, self.jira_api_token, self.jira_project_key)
         )
+
+
+def parse_report_selection(text: str) -> tuple[str, ...]:
+    """Turn ``"html, Allure"`` into ``("html", "allure")``; ``all`` = every type, ``none`` = no reports.
+
+    Real-life example: a nightly job sets ``REPORTS=junit,coverage`` for the build server, while a
+    developer runs ``--reports html`` for a quick look. A typo (``alure``) is an error, never a silent gap.
+    """
+    names = [part.strip().lower() for part in str(text).split(",") if part.strip()]
+    if not names or names == ["all"]:
+        return REPORT_NAMES
+    if "none" in names:
+        if names != ["none"]:
+            raise ConfigurationError("reports: 'none' cannot be combined with other report types")
+        return ()
+    unknown = [n for n in names if n not in REPORT_NAMES]
+    if unknown:
+        raise ConfigurationError(f"reports: unknown {unknown}; choose from {REPORT_NAMES}, 'all' or 'none'")
+    return tuple(dict.fromkeys(names))  # drop duplicates, keep order
 
 
 def _require_in(name: str, value: str, allowed: tuple[str, ...]) -> None:

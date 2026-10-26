@@ -24,6 +24,13 @@ docs/SELF_HEALING.md). **Not run:** healing in a real browser, the `--record-loc
 `--fail-on-heal` under real pytest. The committed baseline `config/locator_fingerprints.json` is empty until you
 record it on a known-good build. Healed locators are not screenshotted (the failure screenshots still apply).
 
+Selectable reports (`REPORTS` / `--reports`): parsing, option switching, missing-plugin handling and the coverage
+writer are verified offline (with a stand-in for `coverage`). **Not run for real:** that html, junit and allure
+pick up the options this plugin sets before they start (written against their documented option names), that
+xdist workers inherit them, and pytest-cov's `--cov-report=` (empty = print nothing) plus reading its data file at
+the end of the run. If a report is missing on your first run, `pytest --reports <type>` and the run header line
+(`reports: ...`) tell you which side is at fault.
+
 First step in your environment: `make install && make unit data db`, then `make smoke`.
 
 ## Not included, and why

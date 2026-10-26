@@ -4,16 +4,15 @@ Author  : Anil Kalisetti
 Purpose : Collect every test outcome and publish the management summary after the run.
 
 Main process only. Reports are generated in ``pytest_terminal_summary`` (as late as
-possible) so that pytest-cov has already written ``coverage.xml`` and the Jira plugin has
-already created its defects, letting the summary show both coverage and defect links.
+possible) so that pytest-cov has already saved its data and the Jira plugin has already
+created its defects, letting the summary show both coverage and defect links. It also writes the
+coverage outputs when ``coverage`` is selected, and skips the summary unless ``executive`` is.
 """
 
 from __future__ import annotations
 
 import time
-import xml.etree.ElementTree as ET
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -22,6 +21,7 @@ from framework.core.ci_info import detect_build_info
 from framework.core.logger import get_logger
 from framework.plugins.jira_plugin import PLUGIN_NAME as JIRA_PLUGIN_NAME
 from framework.plugins.stash import ensure_settings
+from framework.reporting.coverage_report import CoverageReporter
 from framework.reporting.executive_report import write_reports
 from framework.reporting.models import CaseResult, RunMetadata, RunSummary
 from framework.ui.healing.transport import parse_heals
@@ -51,16 +51,6 @@ def _short_message(report: pytest.TestReport) -> str:
         crash = getattr(longrepr, "reprcrash", None)
         text = crash.message if crash else str(longrepr or "")
     return " ".join(text.split())[:300]
-
-
-def read_coverage_percent(path: Path, newer_than: float) -> float | None:
-    """Line coverage from Cobertura XML, ignoring a stale file left by a previous run."""
-    try:
-        if path.stat().st_mtime < newer_than:
-            return None
-        return float(ET.parse(path).getroot().attrib["line-rate"]) * 100  # noqa: S314 - own file
-    except (OSError, ET.ParseError, KeyError, ValueError):
-        return None
 
 
 class ExecutiveReportPlugin:
@@ -105,10 +95,21 @@ class ExecutiveReportPlugin:
         elif report.when == "teardown" and report.failed and record.outcome == "passed":
             record.outcome, record.message = "error", _short_message(report)
 
+    def _coverage(self, terminalreporter: pytest.TerminalReporter) -> float | None:
+        """Write the coverage outputs if selected; always return the % so the summary can show it."""
+        reporter = CoverageReporter(self.settings.reports_path, self._started)
+        if self.settings.wants_report("coverage"):
+            terminalreporter.write_sep("=", "Coverage")
+            return reporter.publish(terminalreporter.write_line)
+        return reporter.percent()
+
     @pytest.hookimpl(trylast=True)
     def pytest_terminal_summary(
         self, terminalreporter: pytest.TerminalReporter, config: pytest.Config
     ) -> None:
+        coverage_percent = self._coverage(terminalreporter)
+        if not self.settings.wants_report("executive"):
+            return
         jira = config.pluginmanager.get_plugin(JIRA_PLUGIN_NAME)
         for nodeid, record in self._records.items():
             record.reruns = self._reruns.get(nodeid, 0)
@@ -136,7 +137,7 @@ class ExecutiveReportPlugin:
             list(self._records.values()),
             s.pass_rate_green,
             s.pass_rate_amber,
-            read_coverage_percent(s.reports_path / "coverage.xml", self._started),
+            coverage_percent,
         )
         paths = write_reports(summary, s.reports_path)
         terminalreporter.write_sep("=", "Executive summary")

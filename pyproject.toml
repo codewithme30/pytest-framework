@@ -17,22 +17,17 @@ authors = [{ name = "Anil Kalisetti" }]
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["."]
-# Reports are produced on every run so CI and local runs behave identically.
+# Which reports a run produces is chosen at run time (REPORTS env var or --reports), see
+# framework/plugins/report_selection_plugin.py. Coverage is only *collected* here; its outputs
+# (terminal table, XML, HTML) are written when "coverage" is selected. Use --no-cov to skip tracing.
 addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
     "--dist=loadgroup",  # honours @pytest.mark.xdist_group; ignored when not running with -n
     "--import-mode=importlib",
-    "--junitxml=reports/junit.xml",
-    "--html=reports/report.html",
-    "--self-contained-html",
-    "--alluredir=reports/allure-results",
-    "--clean-alluredir",
     "--cov=framework",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=xml:reports/coverage.xml",
-    "--cov-report=html:reports/coverage-html",
+    "--cov-report=",
 ]
 timeout = 180
 filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]

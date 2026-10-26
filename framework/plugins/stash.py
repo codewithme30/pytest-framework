@@ -26,6 +26,7 @@ def ensure_settings(config: pytest.Config) -> Settings:
             "execution_mode": config.getoption("execution_mode"),
             "grid_url": config.getoption("grid_url"),
             "screenshot_policy": config.getoption("screenshots"),
+            "reports": config.getoption("reports"),
             "build_name": config.getoption("build_name") or f"{build.provider}-{build.build_number}",
             "headless": False if config.getoption("headed") else None,
             "locator_healing": False if config.getoption("no_healing") else None,

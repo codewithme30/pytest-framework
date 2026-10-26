@@ -9,6 +9,7 @@ Examples
     pytest --test-env staging --raise-jira-defects
     pytest --ui-browsers chrome,firefox -m ui       # every UI test once per browser
     pytest --tags "smoke or uat" -n auto            # group by tag, run in parallel
+    pytest --reports html,junit                     # only these reports (REPORTS=... works too)
 """
 
 from __future__ import annotations
@@ -46,6 +47,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--build-name", default=None, help="Build label shown in cloud dashboards")
     group.addoption(
         "--screenshots", default=None, choices=SCREENSHOT_POLICIES, help="Screenshot capture policy"
+    )
+    group.addoption(
+        "--reports",
+        default=None,
+        help="Reports to generate: comma list of executive,html,junit,allure,coverage, or 'all' / 'none'",
+    )
+    group.addoption(
+        "--list-reports", action="store_true", default=False, help="Show the available report types, then exit"
     )
     group.addoption("--no-healing", action="store_true", default=False, help="Disable self-healing locators")
     group.addoption(
