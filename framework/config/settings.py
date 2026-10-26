@@ -31,7 +31,7 @@ from framework.core.yaml_loader import load_yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 EXECUTION_MODES = ("local", "remote", "saucelabs", "browserstack", "lambdatest")
-BROWSERS = ("chrome", "firefox", "edge")
+BROWSERS = ("chrome", "firefox", "edge", "safari")
 SCREENSHOT_POLICIES = ("on_failure", "always", "never")
 
 # Fields that must never be committed to a YAML file.

@@ -12,6 +12,13 @@
 | Public API tests (JSONPlaceholder, httpbingo) | **Not run.** A few expectations (`/bytes/0`, `x-total-count`, `/posts/abc`) are from memory. |
 | Live Jira | **Not run**; request shapes follow Jira Cloud REST v3. |
 
+Added later (parallel, tags, multi-browser, OOP refactor): the pure logic and class hierarchies
+were verified offline (378 passed, 1 skipped) using a fake Selenium, and 7 deliberate bugs in the new
+code were each caught by the tests. **Not run for real:** the `--tags`/`--list-tags` plugin hooks
+under genuine pytest, `pytest_generate_tests` browser fan-out, per-worker DB/log files under a real
+`pytest -n`, and the refactored page objects against a real browser. Also, `--dist=loadgroup` and
+the per-worker log recipe follow the pytest-xdist documentation but have not been exercised here.
+
 First step in your environment: `make install && make unit data db`, then `make smoke`.
 
 ## Not included, and why

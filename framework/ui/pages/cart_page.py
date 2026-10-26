@@ -15,6 +15,9 @@ class CartPage(BasePage):
     CHECKOUT = css('[data-test="checkout"]')
     CONTINUE_SHOPPING = css('[data-test="continue-shopping"]')
 
+    def is_loaded(self) -> bool:
+        return "cart" in self.current_url and self.is_visible(self.CHECKOUT)
+
     @property
     def item_names(self) -> list[str]:
         """Names of items in the cart (empty list for an empty cart)."""

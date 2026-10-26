@@ -18,6 +18,7 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from framework.config.settings import get_settings
+from framework.core.parallel import current_db_url
 from framework.db.client import DatabaseClient
 from framework.db.repository import DataRepository
 from framework.sample_app.tax_calculator import calculate_total
@@ -25,7 +26,7 @@ from framework.sample_app.tax_calculator import calculate_total
 
 def _load_cases() -> list:
     """Runs at collection time. A missing table skips the module instead of erroring the run."""
-    client = DatabaseClient(get_settings().db_url)
+    client = DatabaseClient(current_db_url(get_settings().db_url))
     try:
         rows = DataRepository(client).fetch_cases()
     except SQLAlchemyError:

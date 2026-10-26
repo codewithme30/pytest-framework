@@ -11,14 +11,18 @@ from collections.abc import Iterator
 import pytest
 
 from framework.config.settings import Settings
+from framework.core.parallel import current_db_url
 from framework.db.client import DatabaseClient
 from framework.db.repository import DataRepository
 
 
 @pytest.fixture(scope="session")
 def db(settings: Settings) -> Iterator[DatabaseClient]:
-    """The database from DB_URL (the seeded sample SQLite file by default)."""
-    client = DatabaseClient(settings.db_url)
+    """The database from DB_URL (the seeded sample SQLite file by default).
+
+    Under pytest-xdist each worker gets its own SQLite copy, so parallel write-backs are safe.
+    """
+    client = DatabaseClient(current_db_url(settings.db_url))
     yield client
     client.dispose()
 

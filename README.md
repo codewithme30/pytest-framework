@@ -32,8 +32,9 @@ No `make`? Use `pytest -m smoke -n auto` directly. All options are plain pytest 
 |---|---|---|
 | Config | `framework/config`, `config/environments/*.yaml`, `.env` | CLI > env > YAML > defaults; secrets only from env |
 | UI | `framework/ui`, `tests/ui` | Page Objects, Selenium 4 driver factory, SauceDemo examples |
-| Cloud grids | `framework/ui/driver_factory.py` | `--execution-mode saucelabs\|browserstack\|lambdatest\|remote`; URL + auth are placeholders in `.env` |
-| API | `framework/api`, `tests/api` | Retrying client, JSON-schema checks; JSONPlaceholder + httpbingo |
+| Browsers / targets | `framework/ui/browsers.py`, `targets.py` | one class per browser (Chrome, Firefox, Edge, Safari) and per place to run (local, Grid, Sauce Labs, BrowserStack, LambdaTest) |
+| Cloud grids | `framework/ui/targets.py` | `--execution-mode saucelabs\|browserstack\|lambdatest\|remote`; URL + auth are placeholders in `.env` |
+| API | `framework/api`, `tests/api` | Retrying client, one service class per resource, JSON-schema checks; JSONPlaceholder + httpbingo |
 | Database | `framework/db`, `tests/db` | Fetch test data from a DB, run it, write results back |
 | ETL / migration | `framework/data`, `tests/data` | Source-vs-target: counts, schema, nulls, duplicates, orphans, aggregates, full row diff, ~40 edge cases |
 | Reporting | `framework/reporting` | Self-contained HTML + Markdown + JSON, GREEN/AMBER/RED verdict, trend history |
@@ -42,6 +43,15 @@ No `make`? Use `pytest -m smoke -n auto` directly. All options are plain pytest 
 | Screenshots | `framework/ui/screenshot.py` | On failure (configurable), attached to every report |
 | Parallel / retry | xdist, rerunfailures, timeout | xdist-safe plugins |
 | CI/CD | `.github/workflows`, `Jenkinsfile`, `.gitlab-ci.yml`, `azure-pipelines.yml` | Same `pytest` commands everywhere |
+
+## Parallel, tags and browsers
+
+```bash
+pytest -n auto --tags "smoke or uat"                  # parallel, grouped by tag
+pytest -m ui --ui-browsers chrome,firefox -n 4        # every UI test on two browsers, 4 workers
+pytest --list-tags                                    # tests per tag
+```
+Details, safety rules for parallel runs and the OOP map: [docs/RUNNING.md](docs/RUNNING.md).
 
 ## Run it your way
 

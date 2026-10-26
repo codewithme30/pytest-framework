@@ -38,6 +38,10 @@ class CheckoutPage(BasePage):
     COMPLETE_HEADER = css('[data-test="complete-header"]')
     BACK_HOME = css('[data-test="back-to-products"]')
 
+    def is_loaded(self) -> bool:
+        """True on any of the three checkout screens (details, overview, confirmation)."""
+        return "checkout" in self.current_url
+
     # --- step one: customer information ------------------------------------------------
     def fill_customer_info(self, first: str, last: str, postal: str) -> None:
         self.type_text(self.FIRST_NAME, first)

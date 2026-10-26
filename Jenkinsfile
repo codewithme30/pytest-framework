@@ -7,7 +7,8 @@ pipeline {
     agent { dockerfile true }            // uses the repo Dockerfile: same image as local runs
 
     parameters {
-        string(name: 'MARKER', defaultValue: 'not slow', description: 'pytest -m expression')
+        string(name: 'TAGS', defaultValue: 'not slow', description: 'Tag expression: smoke, uat, regression and not slow ...')
+        string(name: 'BROWSERS', defaultValue: 'chrome,firefox', description: 'chrome,firefox,edge or all')
         choice(name: 'EXECUTION_MODE', choices: ['local', 'remote', 'saucelabs', 'browserstack', 'lambdatest'])
         booleanParam(name: 'RAISE_JIRA_DEFECTS', defaultValue: false)
     }
@@ -34,7 +35,7 @@ pipeline {
         }
         stage('Regression') {
             steps {
-                sh """pytest -m "${params.MARKER}" -n 4 --reruns 1 --only-rerun WebDriverException \
+                sh """pytest --tags "${params.TAGS}" --ui-browsers "${params.BROWSERS}" -n 4 --reruns 1 --only-rerun WebDriverException \
                       --build-name "jenkins-${env.BUILD_NUMBER}" \
                       ${params.RAISE_JIRA_DEFECTS ? '--raise-jira-defects' : ''}"""
             }

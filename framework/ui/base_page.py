@@ -4,9 +4,16 @@ Author  : Anil Kalisetti
 Purpose : Page Object base class: every interaction goes through explicit, bounded waits.
 
 Page objects expose *business actions* (``login_as``); tests never touch locators directly.
+
+OOP concepts: ``BasePage`` is abstract (every page MUST say how to recognise itself via
+``is_loaded``), concrete pages inherit all interaction helpers (inheritance), keep their
+locators as class attributes (encapsulation: tests never see a selector), and tests treat any
+page through the same ``is_loaded()`` call (polymorphism).
 """
 
 from __future__ import annotations
+
+from abc import ABC, abstractmethod
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
@@ -24,11 +31,15 @@ def css(selector: str) -> Locator:
     return (By.CSS_SELECTOR, selector)
 
 
-class BasePage:
+class BasePage(ABC):
     def __init__(self, driver: WebDriver, timeout: int = 10) -> None:
         self.driver = driver
         self.timeout = timeout
         self._wait = WebDriverWait(driver, timeout)
+
+    @abstractmethod
+    def is_loaded(self) -> bool:
+        """True when this page (and not another) is currently displayed."""
 
     # --- navigation ---------------------------------------------------------
     def open(self, url: str) -> None:

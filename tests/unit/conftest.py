@@ -11,8 +11,10 @@ the REAL ``requests`` stack (retries, headers, multipart) instead of a simulatio
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
+import types
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -107,3 +109,98 @@ def _restore_settings_cache() -> Iterator[None]:
     saved = settings_module._cached
     yield
     settings_module._cached = saved
+
+
+# --- fake Selenium ------------------------------------------------------------------------------------
+class FakeOptions:
+    """Records what the framework asks of a Selenium options object."""
+
+    def __init__(self) -> None:
+        self.arguments: list[str] = []
+        self.capabilities: dict[str, Any] = {}
+        self.binary_location: str | None = None
+
+    def add_argument(self, argument: str) -> None:
+        self.arguments.append(argument)
+
+    def set_capability(self, key: str, value: Any) -> None:
+        self.capabilities[key] = value
+
+
+class FakeDriver:
+    """Stands in for a WebDriver: remembers how it was created and what was done to it."""
+
+    def __init__(self, kind: str, **kwargs: Any) -> None:
+        self.kind, self.kwargs = kind, kwargs
+        self.window_size: tuple[int, int] | None = None
+        self.page_load_timeout: float | None = None
+        self.scripts: list[str] = []
+
+    def set_page_load_timeout(self, seconds: float) -> None:
+        self.page_load_timeout = seconds
+
+    def set_window_size(self, width: int, height: int) -> None:
+        self.window_size = (width, height)
+
+    def execute_script(self, script: str) -> None:
+        self.scripts.append(script)
+
+
+@dataclass
+class FakeSelenium:
+    drivers: list[FakeDriver] = field(default_factory=list)
+
+
+@pytest.fixture
+def fake_selenium(monkeypatch: pytest.MonkeyPatch) -> FakeSelenium:
+    """Replace the ``selenium`` package so browser/target/page code runs with no browser installed.
+
+    Real-life use: verify "Firefox headless gets -headless" in milliseconds on any laptop or CI
+    runner, instead of launching Firefox just to read back its command line.
+    """
+    fake = FakeSelenium()
+
+    def launcher(kind: str):
+        def start(**kwargs: Any) -> FakeDriver:
+            driver = FakeDriver(kind, **kwargs)
+            fake.drivers.append(driver)
+            return driver
+
+        return start
+
+    def module(name: str, **attrs: Any) -> types.ModuleType:
+        mod = types.ModuleType(name)
+        mod.__dict__.update(attrs)
+        monkeypatch.setitem(sys.modules, name, mod)
+        return mod
+
+    selenium = module("selenium")
+    webdriver = module(
+        "selenium.webdriver",
+        Chrome=launcher("chrome"),
+        Firefox=launcher("firefox"),
+        Edge=launcher("edge"),
+        Safari=launcher("safari"),
+        Remote=launcher("remote"),
+    )
+    selenium.webdriver = webdriver  # type: ignore[attr-defined]
+    for browser in ("chrome", "firefox", "edge", "safari"):
+        module(f"selenium.webdriver.{browser}")
+        module(f"selenium.webdriver.{browser}.options", Options=type(f"{browser.title()}Options", (FakeOptions,), {}))
+
+    # Names imported at the top of framework.ui.base_page
+    class TimeoutException(Exception):
+        pass
+
+    module("selenium.common")
+    module("selenium.common.exceptions", TimeoutException=TimeoutException)
+    module("selenium.webdriver.common")
+    module("selenium.webdriver.common.action_chains", ActionChains=object)
+    module("selenium.webdriver.common.by", By=types.SimpleNamespace(CSS_SELECTOR="css selector"))
+    module("selenium.webdriver.remote")
+    module("selenium.webdriver.remote.webdriver", WebDriver=object)
+    module("selenium.webdriver.remote.webelement", WebElement=object)
+    support = module("selenium.webdriver.support")
+    support.expected_conditions = module("selenium.webdriver.support.expected_conditions")  # type: ignore[attr-defined]
+    module("selenium.webdriver.support.ui", Select=object, WebDriverWait=lambda driver, timeout: None)
+    return fake

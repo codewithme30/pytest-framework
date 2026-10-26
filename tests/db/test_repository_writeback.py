@@ -61,3 +61,28 @@ def test_unsafe_table_name_is_rejected(scratch_db):
 def test_unknown_id_updates_nothing(seeded_repo):
     seeded_repo.record_result(9999, True, actual="1.00")
     assert seeded_repo.status_summary() == {STATUS_NEW: 15}
+
+
+# --- inheritance: a second team reuses the same mechanics with their own table ----------------------
+def test_repository_without_a_table_name_is_rejected(scratch_db):
+    from framework.db.repository import ScenarioRepository
+
+    with pytest.raises(TypeError, match="table"):
+        ScenarioRepository(scratch_db)
+
+
+def test_subclass_only_names_its_table(scratch_db):
+    from framework.db.repository import ScenarioRepository
+
+    class LoanCaseRepository(ScenarioRepository):
+        table = "loan_cases"
+
+    scratch_db.execute(
+        "CREATE TABLE loan_cases (id INTEGER PRIMARY KEY, status TEXT, actual_total TEXT, "
+        "error_message TEXT, executed_at TEXT)"
+    )
+    scratch_db.execute("INSERT INTO loan_cases (id, status) VALUES (1, 'NEW')")
+    repo = LoanCaseRepository(scratch_db)
+    assert [row["id"] for row in repo.fetch_cases()] == [1]
+    repo.record_result(1, passed=True, actual="1000.00")
+    assert repo.status_summary() == {"PASSED": 1}

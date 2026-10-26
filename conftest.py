@@ -9,15 +9,18 @@ tests/data/conftest.py) so each layer stays independent and easy to lift into an
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
 
 from framework.config.settings import Settings
+from framework.core.parallel import current_db_url, worker_id, worker_log_path
 from framework.plugins.stash import ensure_settings
 
 pytest_plugins = [
     "framework.plugins.options",
+    "framework.plugins.tags_plugin",
     "framework.plugins.evidence_plugin",
     "framework.plugins.jira_plugin",
     "framework.plugins.executive_report_plugin",
@@ -29,16 +32,32 @@ _LAYERS = ("ui", "api", "data", "db", "unit")
 def pytest_configure(config: pytest.Config) -> None:
     settings = ensure_settings(config)
     settings.reports_path.mkdir(parents=True, exist_ok=True)
+    _configure_worker_logging(settings.reports_path)
 
-    is_main_process = not hasattr(config, "workerinput")  # xdist workers must not re-seed
-    if is_main_process and settings.seed_sample_db and settings.db_url.startswith("sqlite"):
+    # Every process (controller and each xdist worker) seeds ITS OWN database copy, so parallel
+    # write-back tests never fight over one SQLite file. Non-SQLite URLs are left to the team.
+    db_url = current_db_url(settings.db_url)
+    if settings.seed_sample_db and db_url.startswith("sqlite"):
         # Local import: only runs when a database driver is actually needed.
         from framework.db.client import DatabaseClient
         from framework.db.sample_data import seed_sample_database
 
-        db = DatabaseClient(settings.db_url)
+        db = DatabaseClient(db_url)
         seed_sample_database(db)
         db.dispose()
+
+
+def _configure_worker_logging(reports_dir: Path) -> None:
+    """One log file per process (recipe from the pytest-xdist docs); a shared file is clobbered."""
+    log_file = worker_log_path(reports_dir, worker_id())
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        filename=log_file,
+        filemode="w",
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        force=True,
+    )
 
 
 def pytest_report_header(config: pytest.Config) -> list[str]:

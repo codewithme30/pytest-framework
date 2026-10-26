@@ -14,9 +14,12 @@ on:
     - cron: "30 6 * * 1-5"          # weekdays 06:30 UTC: nightly regression
   workflow_dispatch:
     inputs:
-      marker:
-        description: "pytest -m expression"
+      tags:
+        description: "Tag expression, e.g. 'smoke', 'uat', 'regression and not slow'"
         default: "not slow"
+      browsers:
+        description: "UI browsers: comma list (chrome,firefox,edge) or all"
+        default: "chrome,firefox"
       execution_mode:
         description: "UI execution mode"
         type: choice
@@ -112,8 +115,9 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run UI + API regression
         run: >
-          pytest -m "${{ inputs.marker || 'not slow' }}" -n 4
-          --reruns 1 --only-rerun WebDriverException
+          pytest --tags "${{ inputs.tags || 'not slow' }}"
+          --ui-browsers "${{ inputs.browsers || 'chrome,firefox' }}"
+          -n 4 --reruns 1 --only-rerun WebDriverException
           --build-name "gha-${{ github.run_number }}"
           ${{ inputs.raise_jira_defects && '--raise-jira-defects' || '' }}
       - name: Publish management summary

@@ -7,6 +7,8 @@ Examples
     pytest -m smoke --ui-browser firefox --headed
     pytest -m ui --execution-mode saucelabs --build-name release-24.3
     pytest --test-env staging --raise-jira-defects
+    pytest --ui-browsers chrome,firefox -m ui       # every UI test once per browser
+    pytest --tags "smoke or uat" -n auto            # group by tag, run in parallel
 """
 
 from __future__ import annotations
@@ -20,6 +22,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("framework", "pytest-framework options")
     group.addoption("--test-env", default=None, help="Environment file to load (qa, staging, ...)")
     group.addoption("--ui-browser", default=None, choices=BROWSERS, help="Browser for UI tests")
+    group.addoption(
+        "--ui-browsers",
+        default=None,
+        help="Comma separated browsers to run every UI test on (chrome,firefox,edge,safari) or 'all'",
+    )
+    group.addoption(
+        "--tags",
+        default=None,
+        help="Marker expression, validated against registered markers, e.g. 'smoke or uat'",
+    )
+    group.addoption(
+        "--list-tags", action="store_true", default=False, help="Show how many tests carry each tag, then exit"
+    )
     group.addoption("--headed", action="store_true", default=False, help="Show the browser window")
     group.addoption(
         "--execution-mode",

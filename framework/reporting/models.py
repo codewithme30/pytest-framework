@@ -15,11 +15,17 @@ reported separately and never inflate or deflate the rate.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 
+from framework.config.settings import BROWSERS
+from framework.core.tags import STANDARD_TAGS
+
 FAILING = frozenset({"failed", "error"})
+_PARAM_SUFFIX = re.compile(r"\[([^\]]*)\]$")
 
 
 @dataclass
@@ -37,6 +43,13 @@ class CaseResult:
     @property
     def short_name(self) -> str:
         return self.nodeid.rsplit("::", 1)[-1]
+
+    @property
+    def browser(self) -> str:
+        """Browser name when the test id carries one (``test_login[firefox]``), else ''."""
+        suffix = _PARAM_SUFFIX.search(self.nodeid)
+        tokens = suffix.group(1).split("-") if suffix else []
+        return next((t for t in tokens if t in BROWSERS), "")
 
 
 @dataclass
@@ -106,6 +119,23 @@ class RunSummary:
         for r in self.results:
             layers.setdefault(r.layer, Counter())[r.outcome] += 1
         return dict(sorted(layers.items()))
+
+    def by_tag(self, tags: Sequence[str] = STANDARD_TAGS) -> dict[str, Counter[str]]:
+        """Outcome counts per tag (smoke, uat, ...). Tags nobody used are left out."""
+        grouped: dict[str, Counter[str]] = {}
+        for tag in tags:
+            counter = Counter(r.outcome for r in self.results if tag in r.markers)
+            if counter:
+                grouped[tag] = counter
+        return grouped
+
+    def by_browser(self) -> dict[str, Counter[str]]:
+        """Outcome counts per browser, for UI tests that ran on a browser matrix."""
+        grouped: dict[str, Counter[str]] = {}
+        for r in self.results:
+            if r.browser:
+                grouped.setdefault(r.browser, Counter())[r.outcome] += 1
+        return dict(sorted(grouped.items()))
 
     @staticmethod
     def layer_pass_rate(counter: Counter[str]) -> float | None:

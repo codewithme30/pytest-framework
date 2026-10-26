@@ -15,6 +15,9 @@ class LoginPage(BasePage):
     LOGIN_BUTTON = css("#login-button")
     ERROR = css('[data-test="error"]')
 
+    def is_loaded(self) -> bool:
+        return self.is_visible(self.LOGIN_BUTTON)
+
     def load(self, base_url: str) -> LoginPage:
         self.open(base_url)
         self.find(self.LOGIN_BUTTON)

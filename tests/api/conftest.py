@@ -17,6 +17,14 @@ from typing import Any
 import pytest
 
 from framework.api.client import ApiClient
+from framework.api.services import (
+    AlbumsService,
+    CommentsService,
+    PhotosService,
+    PostsService,
+    TodosService,
+    UsersService,
+)
 from framework.config.settings import Settings
 from framework.core.data_loader import load_data
 
@@ -29,6 +37,36 @@ def api_client(settings: Settings) -> Iterator[ApiClient]:
     client = ApiClient(settings.base_api_url, settings.api_timeout, settings.api_retries)
     yield client
     client.close()
+
+
+@pytest.fixture(scope="session")
+def posts_api(api_client: ApiClient) -> PostsService:
+    return PostsService(api_client)
+
+
+@pytest.fixture(scope="session")
+def comments_api(api_client: ApiClient) -> CommentsService:
+    return CommentsService(api_client)
+
+
+@pytest.fixture(scope="session")
+def users_api(api_client: ApiClient) -> UsersService:
+    return UsersService(api_client)
+
+
+@pytest.fixture(scope="session")
+def todos_api(api_client: ApiClient) -> TodosService:
+    return TodosService(api_client)
+
+
+@pytest.fixture(scope="session")
+def albums_api(api_client: ApiClient) -> AlbumsService:
+    return AlbumsService(api_client)
+
+
+@pytest.fixture(scope="session")
+def photos_api(api_client: ApiClient) -> PhotosService:
+    return PhotosService(api_client)
 
 
 @pytest.fixture(scope="session")

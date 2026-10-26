@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from framework.db.client import DatabaseClient, safe_identifier
 
@@ -21,10 +21,24 @@ STATUS_PASSED = "PASSED"
 STATUS_FAILED = "FAILED"
 
 
-class DataRepository:
-    def __init__(self, db: DatabaseClient, table: str = "tax_test_data") -> None:
+class ScenarioRepository:
+    """Generic "scenarios live in a table" base class (inheritance + encapsulation).
+
+    Subclasses name the table and may add domain specific queries; the SQL, parameter binding
+    and identifier validation stay private here, so no test ever builds SQL by hand.
+
+    Real-life example: ``DataRepository`` for tax scenarios, ``LoanCaseRepository`` for a
+    lending team: same read-run-write-back mechanics, different tables.
+    """
+
+    table: ClassVar[str]
+
+    def __init__(self, db: DatabaseClient, table: str | None = None) -> None:
+        name = table or getattr(type(self), "table", "")
+        if not name:
+            raise TypeError(f"{type(self).__name__} must define the class attribute 'table'")
         self._db = db
-        self._table = safe_identifier(table)
+        self._table = safe_identifier(name)
 
     def fetch_cases(
         self, statuses: Sequence[str] = (STATUS_NEW,), limit: int | None = None
@@ -59,3 +73,9 @@ class DataRepository:
             f"SELECT status, COUNT(*) AS n FROM {self._table} GROUP BY status"
         )
         return {row["status"]: int(row["n"]) for row in rows}
+
+
+class DataRepository(ScenarioRepository):
+    """Repository for the sample provincial-tax scenarios (``tax_test_data``)."""
+
+    table = "tax_test_data"

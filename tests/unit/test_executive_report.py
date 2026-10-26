@@ -117,3 +117,69 @@ def test_markdown_lists_failures_for_ci_job_summary():
     md = render_markdown(_summary(_results(1, 1)))
     assert "bad_0" in md
     assert "Pass rate" in md
+
+
+# --- grouping by tag and by browser, and pluggable renderers --------------------------------------------
+def _tagged(name, outcome, markers=(), layer="ui"):
+    return CaseResult(f"tests/{layer}/t.py::{name}", layer, outcome, 0.1, "" if outcome == "passed" else "boom", markers)
+
+
+def test_results_are_grouped_by_tag_and_unused_tags_are_hidden():
+    summary = _summary([
+        _tagged("a", "passed", ("smoke", "uat")),
+        _tagged("b", "failed", ("smoke",)),
+        _tagged("c", "passed", ("regression",)),
+        _tagged("d", "passed"),
+    ])  # fmt: skip
+    groups = summary.by_tag()
+    assert list(groups) == ["smoke", "regression", "uat"]  # standard order; sanity/e2e/critical unused
+    assert groups["smoke"]["passed"] == 1 and groups["smoke"]["failed"] == 1
+    assert groups["uat"]["passed"] == 1
+
+
+def test_results_are_grouped_by_browser_from_the_test_id():
+    summary = _summary([
+        _tagged("test_login[chrome]", "passed"),
+        _tagged("test_login[firefox]", "failed"),
+        _tagged("test_cart[one-item-firefox]", "passed"),
+        _tagged("test_plain", "passed"),
+    ])  # fmt: skip
+    groups = summary.by_browser()
+    assert list(groups) == ["chrome", "firefox"]
+    assert groups["firefox"]["passed"] == 1 and groups["firefox"]["failed"] == 1
+    assert CaseResult("tests/ui/t.py::test_plain", "ui", "passed").browser == ""
+
+
+def test_html_and_markdown_show_tag_and_browser_breakdowns(tmp_path: Path):
+    summary = _summary([_tagged("test_a[chrome]", "passed", ("smoke",)), _tagged("test_a[firefox]", "failed", ("smoke",))])
+    html_text, md_text = render_html(summary, [], tmp_path), render_markdown(summary)
+    assert "Results by test group (tag)" in html_text and "Results by browser" in html_text
+    assert "By test group (tag)" in md_text and "| firefox |" in md_text
+
+
+def test_report_without_tags_or_browsers_has_no_empty_sections(tmp_path: Path):
+    html_text = render_html(_summary(_results(3, 0)), [], tmp_path)
+    assert "Results by test group" not in html_text and "Results by browser" not in html_text
+
+
+def test_json_report_includes_tag_and_browser_groups(tmp_path: Path):
+    summary = _summary([_tagged("test_a[chrome]", "passed", ("uat",))])
+    paths = write_reports(summary, tmp_path)
+    data = json.loads(paths["json"].read_text(encoding="utf-8"))
+    assert data["by_tag"] == {"uat": {"passed": 1}}
+    assert data["by_browser"] == {"chrome": {"passed": 1}}
+
+
+def test_a_new_report_format_is_one_subclass(tmp_path: Path):
+    """Open/closed principle: a CSV report needs a new class, not edits to existing code."""
+    from framework.reporting.executive_report import DEFAULT_RENDERERS, ReportRenderer
+
+    class CsvReport(ReportRenderer):
+        key, filename = "csv", "results.csv"
+
+        def render(self, summary, history, out_dir):
+            return "\n".join(f"{r.short_name},{r.outcome}" for r in summary.results)
+
+    paths = write_reports(_summary(_results(2, 1)), tmp_path, (*DEFAULT_RENDERERS, CsvReport()))
+    assert paths["csv"].read_text(encoding="utf-8").splitlines() == ["ok_0,passed", "ok_1,passed", "bad_0,failed"]
+    assert paths["html"].exists() and paths["json"].exists()

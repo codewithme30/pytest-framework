@@ -3,12 +3,17 @@ Module  : tests/ui/conftest.py
 Author  : Anil Kalisetti
 Purpose : Browser fixtures. One fresh browser per test = full isolation (no shared cookies/cart).
 
+Multi-browser: ``pytest --ui-browsers chrome,firefox`` (or ``all``) runs every UI test once per
+browser. Test ids gain a ``[chrome]`` / ``[firefox]`` suffix. Without the option, the single
+configured browser is used and ids stay unchanged.
+
 Failure screenshots are taken by framework.plugins.evidence_plugin when a test using the
 ``driver`` fixture fails; cloud sessions are marked passed/failed here on teardown.
 """
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,8 +23,10 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 from framework.config.settings import Settings
 from framework.core.data_loader import load_data
-from framework.ui.cloud_status import report_session_status
-from framework.ui.driver_factory import CLOUD_MODES, create_driver
+from framework.plugins.stash import ensure_settings
+from framework.ui.browsers import resolve_browsers
+from framework.ui.driver_factory import create_driver
+from framework.ui.targets import ExecutionTarget
 from framework.ui.pages import CartPage, CheckoutPage, InventoryPage, LoginPage
 
 USERS_FILE = Path(__file__).parent / "test_data" / "users.json"
@@ -44,15 +51,31 @@ def products() -> list[str]:
     return list(PRODUCTS)
 
 
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    """Fan a test out over every browser requested with --ui-browsers (only when more than one)."""
+    if "browser_name" not in metafunc.fixturenames:
+        return
+    browsers = resolve_browsers(metafunc.config.getoption("ui_browsers"), ensure_settings(metafunc.config).browser)
+    if len(browsers) > 1:
+        metafunc.parametrize("browser_name", browsers, indirect=True, scope="function")
+
+
 @pytest.fixture
-def driver(request: pytest.FixtureRequest, settings: Settings) -> Iterator[WebDriver]:
-    browser = create_driver(settings, test_name=request.node.name)
+def browser_name(request: pytest.FixtureRequest, settings: Settings) -> str:
+    """Browser for this test: the parametrized one, else the configured default."""
+    return getattr(request, "param", None) or settings.browser
+
+
+@pytest.fixture
+def driver(request: pytest.FixtureRequest, settings: Settings, browser_name: str) -> Iterator[WebDriver]:
+    run_settings = dataclasses.replace(settings, browser=browser_name)
+    browser = create_driver(run_settings, test_name=request.node.name)
     yield browser
     try:
-        if settings.execution_mode in CLOUD_MODES:
-            call_report = getattr(request.node, "rep_call", None)
-            passed = bool(call_report and call_report.passed)  # no call report => setup failed
-            report_session_status(browser, settings.execution_mode, passed)
+        call_report = getattr(request.node, "rep_call", None)
+        passed = bool(call_report and call_report.passed)  # no call report => setup failed
+        # Local/remote targets ignore this; cloud targets mark the vendor dashboard.
+        ExecutionTarget.for_settings(run_settings).report_status(browser, passed)
     finally:
         browser.quit()
 

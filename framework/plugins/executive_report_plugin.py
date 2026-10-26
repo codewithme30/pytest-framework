@@ -113,6 +113,7 @@ class ExecutiveReportPlugin:
                 record.jira_key = jira.created.get(nodeid, "")
 
         s, build = self.settings, detect_build_info()
+        browsers = sorted({r.browser for r in self._records.values() if r.browser})
         metadata = RunMetadata(
             product=s.product_name,
             environment=s.env,
@@ -122,7 +123,7 @@ class ExecutiveReportPlugin:
             commit=build.commit,
             build_url=build.build_url,
             execution_mode=s.execution_mode,
-            browser=s.browser,
+            browser=", ".join(browsers) or s.browser,
             started_at=self._started_at,
             duration_seconds=time.time() - self._started,
             jira_base_url=s.jira_base_url,

@@ -21,9 +21,10 @@ from __future__ import annotations
 import html
 import json
 import os
+from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from framework.reporting.models import CaseResult, RunSummary
 
@@ -122,6 +123,28 @@ def _failure_rows(summary: RunSummary, out_dir: Path) -> str:
     return "".join(rows)
 
 
+def _group_rows(groups: Mapping[str, Mapping[str, int]]) -> str:
+    """Table rows (name, total, passed, failed, pass rate, bar) for tag / browser breakdowns."""
+    rows = []
+    for name, cnt in groups.items():
+        executed = cnt["passed"] + cnt["failed"] + cnt["error"]
+        rate = f"{100 * cnt['passed'] / executed:.1f}%" if executed else ""
+        rows.append(
+            f"<tr><td><strong>{_esc(name)}</strong></td><td>{sum(cnt.values())}</td><td>{cnt['passed']}</td>"
+            f"<td>{cnt['failed'] + cnt['error']}</td><td>{rate}</td><td>{_bar(cnt)}</td></tr>"
+        )
+    return "".join(rows)
+
+
+def _group_table(title: str, label: str, groups: Mapping[str, Mapping[str, int]]) -> str:
+    if not groups:
+        return ""
+    return (
+        f"<h2>{_esc(title)}</h2><table><tr><th>{_esc(label)}</th><th>Total</th><th>Passed</th>"
+        f"<th>Failed</th><th>Pass rate</th><th>Health</th></tr>{_group_rows(groups)}</table>"
+    )
+
+
 def render_html(summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
     m, c = summary.metadata, summary.counts
     color = _COLORS[summary.verdict]
@@ -176,6 +199,8 @@ def render_html(summary: RunSummary, history: Sequence[Mapping[str, Any]], out_d
 <div class="kpis">{kpi_html}</div>
 <h2>Results by area</h2>
 <table><tr><th>Area</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Pass rate</th><th>Health</th></tr>{layer_rows}</table>
+{_group_table("Results by test group (tag)", "Tag", summary.by_tag())}
+{_group_table("Results by browser", "Browser", summary.by_browser())}
 <h2>Failures needing attention</h2>
 <table><tr><th>Test</th><th>Area</th><th>What went wrong</th><th>Evidence</th><th>Defect</th></tr>{failures}</table>
 {flaky_block}
@@ -214,6 +239,16 @@ def render_markdown(summary: RunSummary) -> str:
         f"| {name} | {sum(cnt.values())} | {cnt['passed']} | {cnt['failed'] + cnt['error']} |"
         for name, cnt in summary.by_layer().items()
     ]
+    for title, label, groups in (
+        ("By test group (tag)", "Tag", summary.by_tag()),
+        ("By browser", "Browser", summary.by_browser()),
+    ):
+        if groups:
+            lines += ["", f"**{title}**", "", f"| {label} | Total | Passed | Failed |", "|---|---|---|---|"]
+            lines += [
+                f"| {name} | {sum(cnt.values())} | {cnt['passed']} | {cnt['failed'] + cnt['error']} |"
+                for name, cnt in groups.items()
+            ]
     if summary.failing:
         lines += ["", "**Failures**", ""]
         lines += [f"- `{r.short_name}` ({r.layer}): {r.message[:140]}" for r in summary.failing[:15]]
@@ -236,7 +271,67 @@ def load_history(path: Path) -> list[dict[str, Any]]:
         return []
 
 
-def write_reports(summary: RunSummary, out_dir: Path) -> dict[str, Path]:
+def render_json(summary: RunSummary) -> str:
+    return json.dumps(
+        {
+            "verdict": summary.verdict,
+            "headline": summary.headline,
+            "pass_rate": round(summary.pass_rate, 2),
+            "counts": dict(summary.counts),
+            "by_tag": {tag: dict(cnt) for tag, cnt in summary.by_tag().items()},
+            "by_browser": {name: dict(cnt) for name, cnt in summary.by_browser().items()},
+            "coverage_pct": summary.coverage_pct,
+            "metadata": summary.metadata.__dict__,
+            "failures": [_result_to_dict(r) for r in summary.failing],
+        },
+        indent=1,
+    )
+
+
+class ReportRenderer(ABC):
+    """One output format. Add a format (CSV, Slack message...) by subclassing; nothing else changes."""
+
+    #: Key in the dict returned by ``write_reports`` and the file written in the reports folder.
+    key: ClassVar[str]
+    filename: ClassVar[str]
+
+    @abstractmethod
+    def render(self, summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
+        """Return the full text of the report."""
+
+    def write(self, summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> Path:
+        path = out_dir / self.filename
+        path.write_text(self.render(summary, history, out_dir), encoding="utf-8")
+        return path
+
+
+class HtmlReport(ReportRenderer):
+    key, filename = "html", "executive_summary.html"
+
+    def render(self, summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
+        return render_html(summary, history, out_dir)
+
+
+class MarkdownReport(ReportRenderer):
+    key, filename = "markdown", "summary.md"
+
+    def render(self, summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
+        return render_markdown(summary)
+
+
+class JsonReport(ReportRenderer):
+    key, filename = "json", "summary.json"
+
+    def render(self, summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
+        return render_json(summary)
+
+
+DEFAULT_RENDERERS: tuple[ReportRenderer, ...] = (HtmlReport(), MarkdownReport(), JsonReport())
+
+
+def write_reports(
+    summary: RunSummary, out_dir: Path, renderers: Sequence[ReportRenderer] = DEFAULT_RENDERERS
+) -> dict[str, Path]:
     """Write all summary artifacts; returns ``{name: path}``. History is updated in place.
 
     TODO(future): to keep a trend across CI runs, persist ``history.json`` between builds
@@ -258,27 +353,7 @@ def write_reports(summary: RunSummary, out_dir: Path) -> dict[str, Path]:
     history = history[-_HISTORY_LIMIT:]
     history_path.write_text(json.dumps(history, indent=1), encoding="utf-8")
 
-    paths = {
-        "html": out_dir / "executive_summary.html",
-        "markdown": out_dir / "summary.md",
-        "json": out_dir / "summary.json",
-        "history": history_path,
-    }
-    paths["html"].write_text(render_html(summary, history, out_dir), encoding="utf-8")
-    paths["markdown"].write_text(render_markdown(summary), encoding="utf-8")
-    paths["json"].write_text(
-        json.dumps(
-            {
-                "verdict": summary.verdict,
-                "headline": summary.headline,
-                "pass_rate": round(summary.pass_rate, 2),
-                "counts": dict(summary.counts),
-                "coverage_pct": summary.coverage_pct,
-                "metadata": summary.metadata.__dict__,
-                "failures": [_result_to_dict(r) for r in summary.failing],
-            },
-            indent=1,
-        ),
-        encoding="utf-8",
-    )
+    paths = {"history": history_path}
+    for renderer in renderers:
+        paths[renderer.key] = renderer.write(summary, history, out_dir)
     return paths

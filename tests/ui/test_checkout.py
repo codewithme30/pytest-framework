@@ -36,6 +36,8 @@ def _fill_valid_customer(checkout_page):
 
 @pytest.mark.smoke
 @pytest.mark.critical
+@pytest.mark.uat
+@pytest.mark.e2e
 def test_customer_can_complete_a_purchase(inventory_page, cart_page, checkout_page, products):
     _go_to_checkout(inventory_page, cart_page, products[:2])
     _fill_valid_customer(checkout_page)
@@ -109,6 +111,7 @@ def test_cancel_on_customer_details_returns_to_the_cart(inventory_page, cart_pag
 
 
 @pytest.mark.regression
+@pytest.mark.e2e
 def test_cart_is_empty_after_a_completed_order(inventory_page, cart_page, checkout_page, products):
     _go_to_checkout(inventory_page, cart_page, products[:3])
     _fill_valid_customer(checkout_page)
