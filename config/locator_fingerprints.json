@@ -1,0 +1,6 @@
+{
+  "_meta": {
+    "note": "Recorded with `pytest --record-locators` on a known-good build. Review diffs before committing."
+  },
+  "fingerprints": {}
+}

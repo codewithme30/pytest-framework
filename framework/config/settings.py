@@ -74,6 +74,15 @@ class Settings:
     browser_version: str = "latest"
     build_name: str = ""
 
+    # --- Self-healing locators (see docs/SELF_HEALING.md) -------------------------
+    locator_healing: bool = True  # --no-healing turns it off for a run
+    heal_threshold: float = 0.8  # minimum similarity (0-1) to accept a look-alike element
+    heal_margin: float = 0.1  # the best look-alike must beat the runner-up by this much
+    heal_after: float = 3.0  # seconds to wait for the original locator before trying to heal
+    locator_baseline: str = "config/locator_fingerprints.json"
+    record_locators: bool = False  # --record-locators: capture fingerprints (known-good build only)
+    fail_on_heal: bool = False  # --fail-on-heal: exit non-zero when anything healed (release gates)
+
     # --- API ----------------------------------------------------------------
     api_timeout: int = 15
     api_retries: int = 3
@@ -103,12 +112,19 @@ class Settings:
         _require_in("execution_mode", self.execution_mode, EXECUTION_MODES)
         _require_in("browser", self.browser, BROWSERS)
         _require_in("screenshot_policy", self.screenshot_policy, SCREENSHOT_POLICIES)
+        if not 0 < self.heal_threshold <= 1 or self.heal_margin < 0 or self.heal_after < 0:
+            raise ConfigurationError("Healing needs 0 < heal_threshold <= 1, heal_margin >= 0, heal_after >= 0")
         if not 0 <= self.pass_rate_amber <= self.pass_rate_green <= 100:
             raise ConfigurationError("Thresholds must satisfy 0 <= amber <= green <= 100")
 
     @property
     def reports_path(self) -> Path:
         return Path(self.reports_dir)
+
+    @property
+    def locator_baseline_path(self) -> Path:
+        path = Path(self.locator_baseline)
+        return path if path.is_absolute() else PROJECT_ROOT / path
 
     @property
     def jira_configured(self) -> bool:

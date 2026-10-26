@@ -43,6 +43,7 @@ Numbers compare as `Decimal`; the transform hook maps legacy conventions (cents 
 | A new environment | copy `config/environments/qa.yaml` |
 | A new page | subclass `BasePage` in `framework/ui/pages` |
 | A new browser | subclass `Browser` (or `ChromiumBrowser`) in `framework/ui/browsers.py`, set `name`; add it to `BROWSERS` in settings (a unit test fails if they drift) |
+| A new healing strategy | subclass `HealingStrategy` (`framework/ui/healing/strategies.py`), add it in `LocatorHealer.from_settings` |
 | A new cloud vendor | subclass `CloudTarget` in `framework/ui/targets.py`: capability block + status script; add the mode to `EXECUTION_MODES` |
 | A new API resource | subclass `ResourceService` in `framework/api/services.py` |
 | A new report format | subclass `ReportRenderer` in `framework/reporting/executive_report.py` |

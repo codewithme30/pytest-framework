@@ -24,6 +24,7 @@ from framework.plugins.jira_plugin import PLUGIN_NAME as JIRA_PLUGIN_NAME
 from framework.plugins.stash import ensure_settings
 from framework.reporting.executive_report import write_reports
 from framework.reporting.models import CaseResult, RunMetadata, RunSummary
+from framework.ui.healing.transport import parse_heals
 
 log = get_logger("plugins.executive")
 
@@ -88,6 +89,8 @@ class ExecutiveReportPlugin:
         record.duration += report.duration
         if props.get("screenshot"):
             record.screenshot = props["screenshot"]
+        if props.get("locator_heals"):  # arrives with the teardown report
+            record.heals = tuple(e.to_dict() for e in parse_heals(report.user_properties))
 
         if report.when == "setup" and not report.passed:
             record.outcome = "skipped" if report.skipped else "error"

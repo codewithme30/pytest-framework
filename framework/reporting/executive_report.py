@@ -145,6 +145,32 @@ def _group_table(title: str, label: str, groups: Mapping[str, Mapping[str, int]]
     )
 
 
+def _score_text(event: Mapping[str, Any]) -> str:
+    score = event.get("score")
+    return "" if score is None else f"{float(score):.2f}"
+
+
+def _healing_block(summary: RunSummary) -> str:
+    """Self-healed locators: the build passed, but someone should fix these selectors."""
+    if not summary.healed:
+        return ""
+    rows = "".join(
+        f"<tr><td>{_esc(e['locator'])}</td><td><code>{_esc(e['original'])}</code></td>"
+        f"<td><code>{_esc(e['healed'])}</code></td><td>{_esc(e['strategy'])}</td>"
+        f"<td>{_score_text(e)}</td>"
+        f"<td>{_esc(r.short_name)}</td></tr>"
+        for r in summary.healed
+        for e in r.heals
+    )
+    return (
+        "<h2>Locators healed automatically (needs review)</h2>"
+        '<p class="small">These checks found their element only after the framework repaired the '
+        "selector. The product works, but the test code is out of date: update the selector.</p>"
+        "<table><tr><th>Locator</th><th>Was</th><th>Now</th><th>How</th><th>Match</th><th>Test</th></tr>"
+        f"{rows}</table>"
+    )
+
+
 def render_html(summary: RunSummary, history: Sequence[Mapping[str, Any]], out_dir: Path) -> str:
     m, c = summary.metadata, summary.counts
     color = _COLORS[summary.verdict]
@@ -160,6 +186,7 @@ def render_html(summary: RunSummary, history: Sequence[Mapping[str, Any]], out_d
         ("Failed", c["failed"] + c["error"]),
         ("Skipped", c["skipped"]),
         ("Flaky (re-run)", len(summary.flaky)),
+        *([("Locators healed", sum(len(r.heals) for r in summary.healed))] if summary.healed else []),
         ("Code coverage", coverage),
         ("Duration", _fmt_duration(m.duration_seconds)),
     ]
@@ -201,6 +228,7 @@ def render_html(summary: RunSummary, history: Sequence[Mapping[str, Any]], out_d
 <table><tr><th>Area</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Pass rate</th><th>Health</th></tr>{layer_rows}</table>
 {_group_table("Results by test group (tag)", "Tag", summary.by_tag())}
 {_group_table("Results by browser", "Browser", summary.by_browser())}
+{_healing_block(summary)}
 <h2>Failures needing attention</h2>
 <table><tr><th>Test</th><th>Area</th><th>What went wrong</th><th>Evidence</th><th>Defect</th></tr>{failures}</table>
 {flaky_block}
@@ -249,6 +277,13 @@ def render_markdown(summary: RunSummary) -> str:
                 f"| {name} | {sum(cnt.values())} | {cnt['passed']} | {cnt['failed'] + cnt['error']} |"
                 for name, cnt in groups.items()
             ]
+    if summary.healed:
+        lines += ["", "**Locators healed automatically (update these selectors)**", ""]
+        lines += [
+            f"- `{e['locator']}`: `{e['original']}` -> `{e['healed']}` ({e['strategy']})"
+            for r in summary.healed
+            for e in r.heals
+        ]
     if summary.failing:
         lines += ["", "**Failures**", ""]
         lines += [f"- `{r.short_name}` ({r.layer}): {r.message[:140]}" for r in summary.failing[:15]]
@@ -280,6 +315,7 @@ def render_json(summary: RunSummary) -> str:
             "counts": dict(summary.counts),
             "by_tag": {tag: dict(cnt) for tag, cnt in summary.by_tag().items()},
             "by_browser": {name: dict(cnt) for name, cnt in summary.by_browser().items()},
+            "locator_heals": [e for r in summary.healed for e in r.heals],
             "coverage_pct": summary.coverage_pct,
             "metadata": summary.metadata.__dict__,
             "failures": [_result_to_dict(r) for r in summary.failing],

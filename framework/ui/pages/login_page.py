@@ -10,9 +10,10 @@ from framework.ui.base_page import BasePage, css
 
 
 class LoginPage(BasePage):
-    USERNAME = css("#user-name")
-    PASSWORD = css("#password")
-    LOGIN_BUTTON = css("#login-button")
+    # Fallbacks are the author's "if the id ever changes, try these" list (self-healing).
+    USERNAME = css("#user-name", fallbacks=['[data-test="username"]', 'input[name="user-name"]'])
+    PASSWORD = css("#password", fallbacks=['[data-test="password"]', 'input[type="password"]'])
+    LOGIN_BUTTON = css("#login-button", fallbacks=['[data-test="login-button"]', 'input[type="submit"]'])
     ERROR = css('[data-test="error"]')
 
     def is_loaded(self) -> bool:

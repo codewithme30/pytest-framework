@@ -26,6 +26,8 @@ from framework.core.data_loader import load_data
 from framework.plugins.stash import ensure_settings
 from framework.ui.browsers import resolve_browsers
 from framework.ui.driver_factory import create_driver
+from framework.ui.healing import FingerprintStore, LocatorHealer
+from framework.ui.healing.transport import export_properties
 from framework.ui.targets import ExecutionTarget
 from framework.ui.pages import CartPage, CheckoutPage, InventoryPage, LoginPage
 
@@ -80,26 +82,44 @@ def driver(request: pytest.FixtureRequest, settings: Settings, browser_name: str
         browser.quit()
 
 
+@pytest.fixture(scope="session")
+def fingerprint_store(settings: Settings) -> FingerprintStore:
+    """The committed locator baseline. Read-only during normal runs."""
+    return FingerprintStore.load(settings.locator_baseline_path)
+
+
 @pytest.fixture
-def login_page(driver: WebDriver, settings: Settings) -> LoginPage:
+def healer(
+    request: pytest.FixtureRequest, driver: WebDriver, settings: Settings, fingerprint_store: FingerprintStore
+) -> Iterator[LocatorHealer]:
+    """Self-healing for this browser session; what it did is reported through user_properties."""
+    instance = LocatorHealer.from_settings(driver, settings, fingerprint_store)
+    yield instance
+    request.node.user_properties.extend(export_properties(instance))
+
+
+@pytest.fixture
+def login_page(driver: WebDriver, settings: Settings, healer: LocatorHealer) -> LoginPage:
     """Login screen, opened and ready (not logged in)."""
-    return LoginPage(driver, settings.explicit_wait).load(settings.base_ui_url)
+    return LoginPage(driver, settings.explicit_wait, healer).load(settings.base_ui_url)
 
 
 @pytest.fixture
-def inventory_page(driver: WebDriver, settings: Settings, login_page: LoginPage, users: dict[str, Any]) -> InventoryPage:
+def inventory_page(
+    driver: WebDriver, settings: Settings, healer: LocatorHealer, login_page: LoginPage, users: dict[str, Any]
+) -> InventoryPage:
     """Product page after a successful login as the standard user."""
     login_page.login_as(**users["standard_user"])
-    page = InventoryPage(driver, settings.explicit_wait)
+    page = InventoryPage(driver, settings.explicit_wait, healer)
     assert page.is_loaded(), "precondition failed: standard_user could not log in"
     return page
 
 
 @pytest.fixture
-def cart_page(driver: WebDriver, settings: Settings) -> CartPage:
-    return CartPage(driver, settings.explicit_wait)
+def cart_page(driver: WebDriver, settings: Settings, healer: LocatorHealer) -> CartPage:
+    return CartPage(driver, settings.explicit_wait, healer)
 
 
 @pytest.fixture
-def checkout_page(driver: WebDriver, settings: Settings) -> CheckoutPage:
-    return CheckoutPage(driver, settings.explicit_wait)
+def checkout_page(driver: WebDriver, settings: Settings, healer: LocatorHealer) -> CheckoutPage:
+    return CheckoutPage(driver, settings.explicit_wait, healer)

@@ -22,6 +22,7 @@ pytest_plugins = [
     "framework.plugins.options",
     "framework.plugins.tags_plugin",
     "framework.plugins.evidence_plugin",
+    "framework.plugins.healing_plugin",
     "framework.plugins.jira_plugin",
     "framework.plugins.executive_report_plugin",
 ]

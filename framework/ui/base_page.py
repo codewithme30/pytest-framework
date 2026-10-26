@@ -14,6 +14,8 @@ page through the same ``is_loaded()`` call (polymorphism).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Any
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
@@ -23,19 +25,24 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
-Locator = tuple[str, str]
+from framework.ui.healing import Locator, LocatorHealer
 
 
-def css(selector: str) -> Locator:
-    """Readable shorthand: ``css('[data-test="login-button"]')``."""
-    return (By.CSS_SELECTOR, selector)
+def css(selector: str, *, fallbacks: tuple[Any, ...] | list[Any] = (), heal: bool = True) -> Locator:
+    """Readable shorthand: ``css('[data-test="login-button"]')``.
+
+    ``fallbacks``: alternate selectors tried if this one stops matching (self-healing).
+    ``heal=False``: never repair this locator automatically (use for actions that move money).
+    """
+    return Locator(By.CSS_SELECTOR, selector, fallbacks=fallbacks, heal=heal)
 
 
 class BasePage(ABC):
-    def __init__(self, driver: WebDriver, timeout: int = 10) -> None:
+    def __init__(self, driver: WebDriver, timeout: int = 10, healer: LocatorHealer | None = None) -> None:
         self.driver = driver
         self.timeout = timeout
         self._wait = WebDriverWait(driver, timeout)
+        self._healer = healer or LocatorHealer.disabled()  # no healer => plain Selenium behaviour
 
     @abstractmethod
     def is_loaded(self) -> bool:
@@ -63,8 +70,29 @@ class BasePage(ABC):
         self._wait.until(ec.url_contains(fragment))
 
     # --- element lookup -------------------------------------------------------
+    def _resolve(self, locator: Locator, condition: Callable[[Locator], Any]) -> Any:
+        """Wait for ``condition(locator)``; if the element never appears, try to heal the locator.
+
+        Only interactions that REQUIRE the element (find, click, type, read) go through here.
+        Probing helpers (``is_visible``, ``is_absent``, ``find_all``) never heal: "is the error
+        banner absent?" must not be answered by a look-alike element.
+        """
+        healer = self._healer
+        locator = healer.preferred(locator)  # healed earlier in this test? use that directly
+        if not healer.can_heal(locator):
+            return healer.record(locator, self._wait.until(condition(locator)))
+
+        patience = min(healer.heal_after, self.timeout)
+        try:
+            return WebDriverWait(self.driver, patience).until(condition(locator))
+        except TimeoutException:
+            healed = healer.heal(locator, self.driver.current_url)
+            if healed is None:  # nothing trustworthy found: keep waiting normally, then fail as before
+                return WebDriverWait(self.driver, max(self.timeout - patience, 1)).until(condition(locator))
+            return self._wait.until(condition(healed))
+
     def find(self, locator: Locator) -> WebElement:
-        return self._wait.until(ec.visibility_of_element_located(locator))
+        return self._resolve(locator, ec.visibility_of_element_located)
 
     def find_all(self, locator: Locator) -> list[WebElement]:
         """Return all matches; an empty list (not an exception) when none exist."""
@@ -72,7 +100,7 @@ class BasePage(ABC):
 
     # --- actions -----------------------------------------------------------------
     def click(self, locator: Locator) -> None:
-        self._wait.until(ec.element_to_be_clickable(locator)).click()
+        self._resolve(locator, ec.element_to_be_clickable).click()
 
     def type_text(self, locator: Locator, text: str, clear: bool = True) -> None:
         element = self.find(locator)

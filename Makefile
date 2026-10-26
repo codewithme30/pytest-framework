@@ -11,7 +11,7 @@ WORKERS ?= auto
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-dev lint format typecheck unit api data db ui smoke regression \
-        all parallel tag tags browsers report allure docker-build docker-test clean
+        all parallel tag tags browsers record-locators report allure docker-build docker-test clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -71,6 +71,9 @@ tags: ## Show how many tests carry each tag (smoke, uat, regression, ...)
 
 browsers: ## UI tests on several browsers: make browsers BROWSERS=chrome,firefox (or all)
 	$(PYTEST) -m ui --ui-browsers $(or $(BROWSERS),all) -n $(WORKERS) --reruns 1 --only-rerun WebDriverException
+
+record-locators: ## Capture locator fingerprints on a KNOWN-GOOD build, then commit the diff
+	$(PYTEST) -m "ui and smoke" --record-locators -n 0
 
 report: ## Open the management summary (macOS: open, Linux: xdg-open)
 	@(open reports/executive_summary.html || xdg-open reports/executive_summary.html) 2>/dev/null || \

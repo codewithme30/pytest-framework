@@ -19,6 +19,11 @@ under genuine pytest, `pytest_generate_tests` browser fan-out, per-worker DB/log
 `pytest -n`, and the refactored page objects against a real browser. Also, `--dist=loadgroup` and
 the per-worker log recipe follow the pytest-xdist documentation but have not been exercised here.
 
+Self-healing locators: logic, guards, reporting and the browser-side JavaScript are verified offline (see
+docs/SELF_HEALING.md). **Not run:** healing in a real browser, the `--record-locators` flow end to end, and
+`--fail-on-heal` under real pytest. The committed baseline `config/locator_fingerprints.json` is empty until you
+record it on a known-good build. Healed locators are not screenshotted (the failure screenshots still apply).
+
 First step in your environment: `make install && make unit data db`, then `make smoke`.
 
 ## Not included, and why

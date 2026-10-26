@@ -202,5 +202,53 @@ def fake_selenium(monkeypatch: pytest.MonkeyPatch) -> FakeSelenium:
     module("selenium.webdriver.remote.webelement", WebElement=object)
     support = module("selenium.webdriver.support")
     support.expected_conditions = module("selenium.webdriver.support.expected_conditions")  # type: ignore[attr-defined]
-    module("selenium.webdriver.support.ui", Select=object, WebDriverWait=lambda driver, timeout: None)
+    class WebDriverWait:
+        """Checks the condition once: enough to tell "found" from "not found" without sleeping."""
+
+        def __init__(self, driver: Any, timeout: float) -> None:
+            self._driver, self.timeout = driver, timeout
+
+        def until(self, method: Any) -> Any:
+            value = method(self._driver)
+            if not value:
+                raise TimeoutException(f"not found within {self.timeout}s")
+            return value
+
+    def first_visible(locator: Any) -> Any:
+        return lambda driver: next((e for e in driver.find_elements(*locator) if e.is_displayed()), False)
+
+    support.expected_conditions.visibility_of_element_located = first_visible  # type: ignore[attr-defined]
+    support.expected_conditions.element_to_be_clickable = first_visible  # type: ignore[attr-defined]
+    support.expected_conditions.url_contains = lambda fragment: lambda driver: fragment in driver.current_url  # type: ignore[attr-defined]
+    module("selenium.webdriver.support.ui", Select=object, WebDriverWait=WebDriverWait)
+    fake.TimeoutException = TimeoutException  # type: ignore[attr-defined]
     return fake
+
+
+class FakeElement:
+    def __init__(self, displayed: bool = True, text: str = "") -> None:
+        self.displayed, self.text, self.clicked = displayed, text, False
+
+    def is_displayed(self) -> bool:
+        return self.displayed
+
+    def click(self) -> None:
+        self.clicked = True
+
+
+class FakeDom:
+    """A browser whose page is a dict of ``(by, value) -> element`` (enough for locator tests)."""
+
+    def __init__(self, elements: dict[tuple[str, str], FakeElement] | None = None) -> None:
+        self.elements = elements or {}
+        self.current_url = "https://shop.example/login"
+
+    def find_elements(self, by: str, value: str) -> list[FakeElement]:
+        element = self.elements.get((by, value))
+        return [element] if element else []
+
+
+@pytest.fixture
+def dom_kit() -> types.SimpleNamespace:
+    """``dom_kit.Dom({...})`` is a fake browser page; ``dom_kit.Element()`` a fake element."""
+    return types.SimpleNamespace(Dom=FakeDom, Element=FakeElement)

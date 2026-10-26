@@ -39,6 +39,7 @@ class CaseResult:
     screenshot: str = ""
     jira_key: str = ""
     reruns: int = 0
+    heals: tuple[dict[str, object], ...] = ()  # locator self-healing events (HealEvent.to_dict)
 
     @property
     def short_name(self) -> str:
@@ -101,6 +102,11 @@ class RunSummary:
     def flaky(self) -> list[CaseResult]:
         """Tests that passed only after being re-run: a reliability risk worth fixing."""
         return [r for r in self.results if r.reruns and r.outcome == "passed"]
+
+    @property
+    def healed(self) -> list[CaseResult]:
+        """Tests that passed (or ran) only because a locator was repaired: fix the selector."""
+        return [r for r in self.results if r.heals]
 
     @property
     def critical_failures(self) -> list[CaseResult]:

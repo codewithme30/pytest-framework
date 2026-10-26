@@ -28,6 +28,9 @@ def ensure_settings(config: pytest.Config) -> Settings:
             "screenshot_policy": config.getoption("screenshots"),
             "build_name": config.getoption("build_name") or f"{build.provider}-{build.build_number}",
             "headless": False if config.getoption("headed") else None,
+            "locator_healing": False if config.getoption("no_healing") else None,
+            "record_locators": True if config.getoption("record_locators") else None,
+            "fail_on_heal": True if config.getoption("fail_on_heal") else None,
         }
         config.stash[SETTINGS_KEY] = load_settings(overrides)
     return config.stash[SETTINGS_KEY]

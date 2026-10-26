@@ -47,6 +47,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--screenshots", default=None, choices=SCREENSHOT_POLICIES, help="Screenshot capture policy"
     )
+    group.addoption("--no-healing", action="store_true", default=False, help="Disable self-healing locators")
+    group.addoption(
+        "--record-locators",
+        action="store_true",
+        default=False,
+        help="Capture element fingerprints into the baseline file (run on a KNOWN-GOOD build only)",
+    )
+    group.addoption(
+        "--fail-on-heal",
+        action="store_true",
+        default=False,
+        help="Exit non-zero if any locator had to be healed (use as a release gate)",
+    )
     group.addoption(
         "--raise-jira-defects",
         action="store_true",

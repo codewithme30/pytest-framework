@@ -31,7 +31,7 @@ No `make`? Use `pytest -m smoke -n auto` directly. All options are plain pytest 
 | Concern | Where | Notes |
 |---|---|---|
 | Config | `framework/config`, `config/environments/*.yaml`, `.env` | CLI > env > YAML > defaults; secrets only from env |
-| UI | `framework/ui`, `tests/ui` | Page Objects, Selenium 4 driver factory, SauceDemo examples |
+| UI | `framework/ui`, `tests/ui` | Page Objects, self-healing locators (`framework/ui/healing`), Selenium 4 driver factory, SauceDemo examples |
 | Browsers / targets | `framework/ui/browsers.py`, `targets.py` | one class per browser (Chrome, Firefox, Edge, Safari) and per place to run (local, Grid, Sauce Labs, BrowserStack, LambdaTest) |
 | Cloud grids | `framework/ui/targets.py` | `--execution-mode saucelabs\|browserstack\|lambdatest\|remote`; URL + auth are placeholders in `.env` |
 | API | `framework/api`, `tests/api` | Retrying client, one service class per resource, JSON-schema checks; JSONPlaceholder + httpbingo |
@@ -52,6 +52,12 @@ pytest -m ui --ui-browsers chrome,firefox -n 4        # every UI test on two bro
 pytest --list-tags                                    # tests per tag
 ```
 Details, safety rules for parallel runs and the OOP map: [docs/RUNNING.md](docs/RUNNING.md).
+
+## Self-healing locators
+A renamed id no longer breaks the suite: broken locators are repaired at run time (declared
+fallbacks, then a fingerprint match with safety guards) and every heal is reported for review.
+`--fail-on-heal` makes it a release gate; `make record-locators` records the baseline.
+See [docs/SELF_HEALING.md](docs/SELF_HEALING.md).
 
 ## Run it your way
 
